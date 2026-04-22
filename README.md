@@ -36,6 +36,8 @@ Repositório de infraestrutura para deploy automatizado do **GeoNode 5.0.2** com
 
 ### Componentes
 
+#### VMs do cluster
+
 | VM | IP (Vagrant) | Papel |
 |---|---|---|
 | `db` | 192.168.56.10 | PostgreSQL 15 + PostGIS 3 |
@@ -47,6 +49,16 @@ Repositório de infraestrutura para deploy automatizado do **GeoNode 5.0.2** com
 | `haproxy-2` | 192.168.56.41 | HAProxy + Keepalived (BACKUP) |
 
 **VIP Keepalived (dev):** `192.168.56.50`
+
+#### Ansible — estrutura em camadas
+
+| Camada | Arquivo | Função |
+|---|---|---|
+| Defaults globais | `group_vars/all.yml` | Todas as variáveis lidas via `lookup('env', ...)` — se existir no `.env` usa o valor; caso contrário aplica o default definido no próprio arquivo |
+| GeoServer Master | `group_vars/geoserver_write.yml` | Papel `write`: exporta NFS, sobe ActiveMQ (broker JMS), control-flow restritivo para operações de escrita |
+| GeoServer Workers | `group_vars/geoserver_read.yml` | Papel `read`: monta NFS do master, modo readonly no cluster JMS, control-flow permissivo para requisições de leitura |
+| Inventário dev | `inventories/vagrant/` | Autenticação com a chave insecure padrão do Vagrant, `deploy_env: vagrant` |
+| Inventário produção | `inventories/production/` | Autenticação com chave SSH própria, VIP de produção separado (`HAPROXY_VIP_PROD`) |
 
 ---
 

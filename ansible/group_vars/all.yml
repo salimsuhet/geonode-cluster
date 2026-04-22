@@ -27,6 +27,13 @@ ip_geoserver_read_2: "{{ lookup('env', 'IP_GEOSERVER_READ_2') | default('192.168
 ip_haproxy_1:        "{{ lookup('env', 'IP_HAPROXY_1')        | default('192.168.56.40', true) }}"
 ip_haproxy_2:        "{{ lookup('env', 'IP_HAPROXY_2')        | default('192.168.56.41', true) }}"
 
+
+# -----------------------------------------------------------------------------
+# PROXY (opcional — deixe vazio para desabilitar)
+# -----------------------------------------------------------------------------
+http_proxy:  "{{ lookup('env', 'HTTP_PROXY')  | default('', true) }}"
+https_proxy: "{{ lookup('env', 'HTTPS_PROXY') | default(http_proxy, true) }}"
+no_proxy:    "{{ lookup('env', 'NO_PROXY')    | default('localhost,127.0.0.1,' ~ ip_db ~ ',' ~ ip_geonode ~ ',' ~ ip_geoserver_write ~ ',' ~ ip_geoserver_read_1 ~ ',' ~ ip_geoserver_read_2 ~ ',' ~ ip_haproxy_1 ~ ',' ~ ip_haproxy_2 ~ ',' ~ haproxy_vip, true) }}"
 # -----------------------------------------------------------------------------
 # BANCO DE DADOS
 # -----------------------------------------------------------------------------
