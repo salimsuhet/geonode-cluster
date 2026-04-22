@@ -1,0 +1,25 @@
+[Unit]
+Description=GeoServer {{ geoserver_role | upper }} ({{ inventory_hostname }})
+After=docker.service network.target
+{% if not geoserver_is_master | bool %}
+After=network.target
+# Workers dependem do master estar acessível
+{% endif %}
+Requires=docker.service
+
+[Service]
+Type=simple
+User=geoserver
+Group=geoserver
+WorkingDirectory=/opt/geoserver
+ExecStart=/usr/bin/docker compose up
+ExecStop=/usr/bin/docker compose down
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geoserver-{{ geoserver_role }}
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+---
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Restart GeoServer
+  systemd:
+    name: geoserver
+    state: restarted
+  listen: Restart GeoServer

@@ -1,0 +1,104 @@
+---
+# roles/geoserver/tasks/main.yml
+# Deploya o GeoServer via Docker em cada nó (write ou read)
+# A variável `geoserver_role` (write|read) e `geoserver_is_master` (bool)
+# são definidas no inventário por host.
+
+- name: Cria estrutura de diretórios GeoServer
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: geoserver
+    group: geoserver
+    mode: '0755'
+  loop:
+    - "{{ geoserver_data_dir }}"
+    - "{{ geoserver_data_dir }}/logs"
+    - "{{ geoserver_data_dir }}/gwc"
+    - /opt/geoserver/config
+  tags: [geoserver]
+
+# ------------------------------------------------------------------
+# Plugins (baixa apenas no master; workers herdam via NFS)
+# ------------------------------------------------------------------
+- name: Cria diretório de plugins
+  file:
+    path: /opt/geoserver/plugins
+    state: directory
+    owner: geoserver
+    mode: '0755'
+  when: geoserver_is_master | bool
+  tags: [geoserver, plugins]
+
+- name: Download e instalação dos plugins GeoServer
+  include_tasks: plugins.yml
+  when: geoserver_is_master | bool
+  tags: [geoserver, plugins]
+
+# ------------------------------------------------------------------
+# Configuração de clustering JMS
+# ------------------------------------------------------------------
+- name: Cria arquivo cluster.properties
+  template:
+    src: cluster.properties.j2
+    dest: "{{ geoserver_data_dir }}/cluster.properties"
+    owner: geoserver
+    group: geoserver
+    mode: '0644'
+  notify: Restart GeoServer
+  tags: [geoserver, config]
+
+# ------------------------------------------------------------------
+# Docker Compose
+# ------------------------------------------------------------------
+- name: Gera docker-compose.yml do GeoServer
+  template:
+    src: docker-compose.geoserver.yml.j2
+    dest: /opt/geoserver/docker-compose.yml
+    owner: geoserver
+    group: geoserver
+    mode: '0644'
+  notify: Restart GeoServer
+  tags: [geoserver, config]
+
+- name: Gera .env do GeoServer
+  template:
+    src: geoserver.env.j2
+    dest: /opt/geoserver/.env
+    owner: geoserver
+    group: geoserver
+    mode: '0600'
+  notify: Restart GeoServer
+  tags: [geoserver, config]
+
+- name: Cria serviço systemd para GeoServer
+  template:
+    src: geoserver.service.j2
+    dest: /etc/systemd/system/geoserver.service
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Restart GeoServer
+  tags: [geoserver]
+
+- name: Habilita e inicia serviço GeoServer
+  systemd:
+    name: geoserver
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  tags: [geoserver]
+
+# ------------------------------------------------------------------
+# Healthcheck (aguarda GeoServer subir antes de continuar)
+# ------------------------------------------------------------------
+- name: Aguarda GeoServer responder (até 5 minutos)
+  uri:
+    url: "http://localhost:{{ geoserver_port }}/geoserver/web/"
+    status_code: 200
+    timeout: 10
+  register: gs_health
+  until: gs_health.status == 200
+  retries: 30
+  delay: 10
+  tags: [geoserver]

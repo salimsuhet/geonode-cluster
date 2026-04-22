@@ -1,0 +1,44 @@
+# postgresql.conf — gerenciado pelo Ansible
+# Baseado nas variáveis do envs/.env
+
+listen_addresses = '*'
+port = {{ postgres_port }}
+max_connections = {{ postgres_max_connections }}
+
+# Memória
+shared_buffers = {{ postgres_shared_buffers }}
+effective_cache_size = {{ postgres_effective_cache }}
+work_mem = {{ postgres_work_mem }}
+maintenance_work_mem = 128MB
+
+# WAL
+wal_level = replica
+max_wal_size = 2GB
+min_wal_size = 256MB
+checkpoint_completion_target = 0.9
+
+# Query planner
+random_page_cost = 1.1
+effective_io_concurrency = 200
+
+# Log
+log_destination = 'stderr'
+logging_collector = on
+log_directory = 'log'
+log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+log_rotation_age = 1d
+log_rotation_size = 100MB
+log_min_duration_statement = 1000
+log_checkpoints = on
+log_connections = off
+log_disconnections = off
+log_lock_waits = on
+log_temp_files = 0
+
+# Autovacuum
+autovacuum = on
+autovacuum_max_workers = 3
+autovacuum_naptime = 1min
+
+# Conexão segura
+ssl = off

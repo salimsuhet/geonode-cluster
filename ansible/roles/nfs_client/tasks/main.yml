@@ -1,0 +1,43 @@
+---
+# roles/nfs_client/tasks/main.yml
+# Roda nos workers (geoserver-read-*) — monta o data dir do master
+
+- name: Instala cliente NFS
+  apt:
+    name:
+      - nfs-common
+      - autofs
+    state: present
+  tags: [nfs, nfs_client]
+
+- name: Cria ponto de montagem
+  file:
+    path: "{{ nfs_export_path }}"
+    state: directory
+    owner: geoserver
+    group: geoserver
+    mode: '0755'
+  tags: [nfs, nfs_client]
+
+- name: Aguarda NFS server estar disponível
+  wait_for:
+    host: "{{ nfs_server }}"
+    port: 2049
+    timeout: 60
+  tags: [nfs, nfs_client]
+
+- name: Monta data dir via NFS (fstab persistente)
+  mount:
+    path: "{{ nfs_export_path }}"
+    src: "{{ nfs_server }}:{{ nfs_export_path }}"
+    fstype: nfs
+    opts: "rw,sync,hard,intr,rsize=8192,wsize=8192,timeo=14"
+    state: mounted
+  tags: [nfs, nfs_client]
+
+- name: Verifica montagem NFS
+  command: "mountpoint -q {{ nfs_export_path }}"
+  register: nfs_mount_check
+  changed_when: false
+  failed_when: nfs_mount_check.rc != 0
+  tags: [nfs, nfs_client]

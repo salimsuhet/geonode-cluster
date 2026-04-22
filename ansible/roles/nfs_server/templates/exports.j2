@@ -1,0 +1,5 @@
+# /etc/exports — gerenciado pelo Ansible
+# Exporta o GeoServer data dir para os workers
+
+{{ nfs_export_path }} {{ ip_geoserver_read_1 }}(rw,sync,no_subtree_check,no_root_squash)
+{{ nfs_export_path }} {{ ip_geoserver_read_2 }}(rw,sync,no_subtree_check,no_root_squash)

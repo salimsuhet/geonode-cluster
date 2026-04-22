@@ -1,0 +1,21 @@
+---
+# group_vars/geoserver_read.yml
+# Variáveis exclusivas dos workers de leitura
+
+geoserver_role: read
+geoserver_is_master: false
+
+# Workers montam o data dir via NFS
+nfs_client_role: true
+
+# Leitores são somente-leitura no cluster JMS
+geoserver_cluster_readonly: true
+
+# Control-flow: mais permissivo para leitura
+geoserver_control_flow_config: |
+  ows.global=200
+  ows.user=20
+  ows.wms=150
+  ows.wfs=100
+  ows.wcs=50
+  timeout=30000

@@ -1,0 +1,92 @@
+---
+# roles/geonode/tasks/main.yml
+
+- name: Cria diretórios GeoNode
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - /opt/geonode
+    - /opt/geonode/static
+    - /opt/geonode/media
+    - /opt/geonode/backup
+  tags: [geonode]
+
+- name: Copia docker-compose do GeoNode
+  template:
+    src: docker-compose.geonode.yml.j2
+    dest: /opt/geonode/docker-compose.yml
+    mode: '0644'
+  notify: Restart GeoNode
+  tags: [geonode, config]
+
+- name: Gera .env do GeoNode
+  template:
+    src: geonode.env.j2
+    dest: /opt/geonode/.env
+    mode: '0600'
+  notify: Restart GeoNode
+  tags: [geonode, config]
+
+- name: Cria serviço systemd GeoNode
+  template:
+    src: geonode.service.j2
+    dest: /etc/systemd/system/geonode.service
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Restart GeoNode
+  tags: [geonode]
+
+- name: Habilita e inicia GeoNode
+  systemd:
+    name: geonode
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  tags: [geonode]
+
+- name: Aguarda GeoNode responder (até 5 minutos)
+  uri:
+    url: "http://localhost/api/v2/resources/"
+    status_code: [200, 401, 403]
+    timeout: 10
+  register: gn_health
+  until: gn_health.status in [200, 401, 403]
+  retries: 30
+  delay: 10
+  tags: [geonode]
+
+- name: Executa migrações Django
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: python manage.py migrate --noinput
+    user: geonode
+  register: migrate_result
+  changed_when: "'No migrations to apply' not in migrate_result.stdout"
+  tags: [geonode, migrate]
+
+- name: Cria superusuário GeoNode
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: >
+      python manage.py shell -c "
+      from django.contrib.auth import get_user_model;
+      User = get_user_model();
+      User.objects.filter(username='{{ geonode_admin_user }}').exists() or
+      User.objects.create_superuser(
+        '{{ geonode_admin_user }}',
+        '{{ geonode_admin_email }}',
+        '{{ geonode_admin_password }}'
+      )"
+  changed_when: false
+  tags: [geonode, users]
+
+- name: Coleta arquivos estáticos
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: python manage.py collectstatic --noinput
+  changed_when: false
+  tags: [geonode, static]

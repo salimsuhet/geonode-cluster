@@ -1,0 +1,45 @@
+# keepalived.conf — {{ inventory_hostname }} ({{ keepalived_role }})
+# Gerenciado pelo Ansible
+
+global_defs {
+    router_id {{ inventory_hostname }}
+    script_user root
+    enable_script_security
+}
+
+# Script de verificação de saúde do HAProxy
+vrrp_script chk_haproxy {
+    script       "/etc/keepalived/check_haproxy.sh"
+    interval     2
+    weight       -20
+    fall         2
+    rise         2
+    timeout      5
+}
+
+# Instância VRRP principal
+vrrp_instance VI_GEONODE {
+    state            {{ keepalived_role }}
+    interface        {{ keepalived_interface }}
+    virtual_router_id {{ keepalived_vrrp_id }}
+    priority         {{ keepalived_priority }}
+    advert_int       1
+    preempt_delay    5
+
+    authentication {
+        auth_type PASS
+        auth_pass {{ keepalived_vrrp_password }}
+    }
+
+    virtual_ipaddress {
+        {{ haproxy_vip }}/24 dev {{ keepalived_interface }} label {{ keepalived_interface }}:0
+    }
+
+    track_script {
+        chk_haproxy
+    }
+
+    notify_master "/bin/bash -c 'logger -t keepalived VRRP MASTER adquirido em {{ inventory_hostname }}'"
+    notify_backup "/bin/bash -c 'logger -t keepalived VRRP BACKUP em {{ inventory_hostname }}'"
+    notify_fault  "/bin/bash -c 'logger -t keepalived VRRP FAULT em {{ inventory_hostname }}'"
+}

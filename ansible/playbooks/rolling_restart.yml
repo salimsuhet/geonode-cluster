@@ -1,0 +1,82 @@
+---
+# playbooks/rolling_restart.yml
+# Reinicialização controlada do cluster GeoServer sem downtime
+# Ordem: read-2 → read-1 → write
+# O HAProxy desativa o backend antes do restart e reativa depois
+#
+# Uso: ansible-playbook -i inventories/vagrant/hosts.yml playbooks/rolling_restart.yml
+
+- name: Rolling Restart — GeoServer Read Workers
+  hosts: geoserver_read
+  serial: 1               # Um worker por vez
+  max_fail_percentage: 0
+  tags: [geoserver, rolling_restart]
+
+  pre_tasks:
+    - name: Drena conexões no HAProxy antes de reiniciar
+      community.general.haproxy:
+        state: disabled
+        host: "{{ inventory_hostname }}"
+        socket: /run/haproxy/admin.sock
+        wait: yes
+        wait_interval: 5
+        wait_retries: 12
+      delegate_to: "{{ groups['haproxy'][0] }}"
+      ignore_errors: true
+
+  roles:
+    - role: geoserver
+      vars:
+        geoserver_restart_only: true
+
+  post_tasks:
+    - name: Aguarda GeoServer subir
+      uri:
+        url: "http://{{ ansible_host }}:{{ geoserver_port }}/geoserver/web/"
+        status_code: 200
+        timeout: 10
+      retries: 18
+      delay: 10
+      register: gs_check
+      until: gs_check.status == 200
+
+    - name: Reabilita backend no HAProxy
+      community.general.haproxy:
+        state: enabled
+        host: "{{ inventory_hostname }}"
+        socket: /run/haproxy/admin.sock
+      delegate_to: "{{ groups['haproxy'][0] }}"
+      ignore_errors: true
+
+    - name: Aguarda estabilização (10s)
+      pause:
+        seconds: 10
+
+- name: Rolling Restart — GeoServer Write (Master)
+  hosts: geoserver_write
+  tags: [geoserver, rolling_restart]
+
+  pre_tasks:
+    - name: Aviso de manutenção no master
+      debug:
+        msg: "Reiniciando GeoServer MASTER. Operações de escrita ficarão indisponíveis brevemente."
+
+  tasks:
+    - name: Reinicia serviço GeoServer master
+      systemd:
+        name: geoserver
+        state: restarted
+
+    - name: Aguarda master responder
+      uri:
+        url: "http://localhost:{{ geoserver_port }}/geoserver/web/"
+        status_code: 200
+        timeout: 10
+      retries: 30
+      delay: 10
+      register: gs_master_check
+      until: gs_master_check.status == 200
+
+    - name: Master reiniciado com sucesso
+      debug:
+        msg: "✔ GeoServer Master UP após rolling restart."

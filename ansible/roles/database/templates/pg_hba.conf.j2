@@ -1,0 +1,16 @@
+# pg_hba.conf — gerenciado pelo Ansible
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# Acesso local (superusuário)
+local   all             postgres                                peer
+local   all             all                                     md5
+
+# Acesso remoto — nós do cluster
+host    {{ postgres_db }}       {{ postgres_user }}   {{ ip_geonode }}/32          md5
+host    {{ postgres_data_db }}  {{ postgres_user }}   {{ ip_geonode }}/32          md5
+host    {{ postgres_db }}       {{ postgres_user }}   {{ ip_geoserver_write }}/32  md5
+host    {{ postgres_db }}       {{ postgres_user }}   {{ ip_geoserver_read_1 }}/32 md5
+host    {{ postgres_db }}       {{ postgres_user }}   {{ ip_geoserver_read_2 }}/32 md5
+
+# Replicação (caso precise no futuro)
+# host    replication     postgres        samenet                 md5

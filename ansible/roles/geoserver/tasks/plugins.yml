@@ -1,0 +1,95 @@
+---
+# roles/geoserver/tasks/plugins.yml
+# Baixa e posiciona plugins no data dir (roda apenas no master)
+
+- name: Define lista de plugins a instalar
+  set_fact:
+    plugin_list: "{{ geoserver_plugins.split(',') | map('trim') | list }}"
+
+- name: Define base URL dos plugins GeoServer
+  set_fact:
+    gs_plugins_base_url: "https://sourceforge.net/projects/geoserver/files/GeoServer/{{ geoserver_version }}/extensions"
+
+- name: Cria diretório de plugins no data dir
+  file:
+    path: "{{ geoserver_data_dir }}/plugins"
+    state: directory
+    owner: geoserver
+    mode: '0755'
+
+- name: Baixa plugin jms-cluster (clustering obrigatório)
+  get_url:
+    url: "{{ gs_plugins_base_url }}/geoserver-{{ geoserver_version }}-jms-cluster-plugin.zip"
+    dest: "/opt/geoserver/plugins/jms-cluster.zip"
+    owner: geoserver
+    mode: '0644'
+    timeout: 120
+  register: dl_jms
+  retries: 3
+  delay: 10
+  when: "'jms-cluster' in plugin_list"
+
+- name: Extrai plugin jms-cluster
+  unarchive:
+    src: /opt/geoserver/plugins/jms-cluster.zip
+    dest: "{{ geoserver_data_dir }}/plugins/"
+    remote_src: yes
+    owner: geoserver
+  when: dl_jms is changed or dl_jms is succeeded
+
+- name: Baixa plugin geofence-server
+  get_url:
+    url: "{{ gs_plugins_base_url }}/geoserver-{{ geoserver_version }}-geofence-server-plugin.zip"
+    dest: "/opt/geoserver/plugins/geofence-server.zip"
+    owner: geoserver
+    mode: '0644'
+    timeout: 120
+  retries: 3
+  delay: 10
+  when: "'geofence-server' in plugin_list"
+
+- name: Extrai plugin geofence-server
+  unarchive:
+    src: /opt/geoserver/plugins/geofence-server.zip
+    dest: "{{ geoserver_data_dir }}/plugins/"
+    remote_src: yes
+    owner: geoserver
+  when: "'geofence-server' in plugin_list"
+
+- name: Baixa plugin control-flow
+  get_url:
+    url: "{{ gs_plugins_base_url }}/geoserver-{{ geoserver_version }}-control-flow-plugin.zip"
+    dest: "/opt/geoserver/plugins/control-flow.zip"
+    owner: geoserver
+    mode: '0644'
+    timeout: 120
+  retries: 3
+  delay: 10
+  when: "'control-flow' in plugin_list"
+
+- name: Extrai plugin control-flow
+  unarchive:
+    src: /opt/geoserver/plugins/control-flow.zip
+    dest: "{{ geoserver_data_dir }}/plugins/"
+    remote_src: yes
+    owner: geoserver
+  when: "'control-flow' in plugin_list"
+
+- name: Baixa plugin monitor
+  get_url:
+    url: "{{ gs_plugins_base_url }}/geoserver-{{ geoserver_version }}-monitor-plugin.zip"
+    dest: "/opt/geoserver/plugins/monitor.zip"
+    owner: geoserver
+    mode: '0644'
+    timeout: 120
+  retries: 3
+  delay: 10
+  when: "'monitor' in plugin_list"
+
+- name: Extrai plugin monitor
+  unarchive:
+    src: /opt/geoserver/plugins/monitor.zip
+    dest: "{{ geoserver_data_dir }}/plugins/"
+    remote_src: yes
+    owner: geoserver
+  when: "'monitor' in plugin_list"

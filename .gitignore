@@ -1,0 +1,48 @@
+# Segredos — NUNCA commitar estes arquivos
+envs/.env
+envs/.env.*
+!envs/.env.example
+
+# Inventários de produção com IPs/senhas reais
+ansible/inventories/production/hosts.yml
+!ansible/inventories/production/hosts.yml.example
+
+# Vagrant
+.vagrant/
+*.box
+
+# Ansible
+*.retry
+ansible/inventories/production/group_vars/vault.yml
+.vault_pass
+vault_password_file
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporários
+/tmp/
+.cache/

@@ -1,0 +1,18 @@
+---
+# inventories/vagrant/group_vars/all.yml
+# No ambiente Vagrant, carrega as variáveis diretamente do envs/.env
+# usando o mecanismo de lookup do Ansible.
+# Os defaults garantem funcionamento mesmo sem o .env.
+
+# Re-exporta todas as vars de group_vars/all.yml
+# (este arquivo serve apenas para sobrescrever o SSH do Vagrant)
+
+ansible_user: vagrant
+ansible_ssh_private_key_file: ~/.vagrant.d/insecure_private_key
+ansible_ssh_common_args: >-
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  -o PasswordAuthentication=no
+ansible_become: true
+ansible_become_method: sudo
+deploy_env: vagrant

@@ -1,0 +1,158 @@
+# docker-compose.yml — GeoNode {{ geonode_version }}
+# Gerenciado pelo Ansible
+
+version: "3.8"
+
+services:
+
+  # ------------------------------------------------------------
+  # Django + uWSGI
+  # ------------------------------------------------------------
+  django:
+    image: geonode/geonode:{{ geonode_version }}
+    container_name: geonode_django
+    restart: unless-stopped
+    env_file: .env
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             uwsgi --ini /usr/src/geonode/uwsgi.ini"
+    volumes:
+      - statics:/mnt/volumes/statics
+      - geoserver_data:{{ geoserver_data_dir }}
+      - backup_restore:/backup_restore
+      - data:/data
+    depends_on:
+      - db
+      - rabbitmq
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - geonode
+
+  # ------------------------------------------------------------
+  # Celery Worker
+  # ------------------------------------------------------------
+  celery:
+    image: geonode/geonode:{{ geonode_version }}
+    container_name: geonode_celery
+    restart: unless-stopped
+    env_file: .env
+    command: celery -A geonode.celery_app:app worker -l INFO -E
+    volumes:
+      - statics:/mnt/volumes/statics
+      - geoserver_data:{{ geoserver_data_dir }}
+      - backup_restore:/backup_restore
+      - data:/data
+    depends_on:
+      - rabbitmq
+      - redis
+      - django
+    networks:
+      - geonode
+
+  # ------------------------------------------------------------
+  # Celery Beat (tarefas agendadas)
+  # ------------------------------------------------------------
+  celerybeat:
+    image: geonode/geonode:{{ geonode_version }}
+    container_name: geonode_celerybeat
+    restart: unless-stopped
+    env_file: .env
+    command: celery -A geonode.celery_app:app beat -l INFO
+    volumes:
+      - statics:/mnt/volumes/statics
+    depends_on:
+      - rabbitmq
+      - redis
+      - django
+    networks:
+      - geonode
+
+  # ------------------------------------------------------------
+  # Nginx (proxy reverso interno)
+  # ------------------------------------------------------------
+  nginx:
+    image: geonode/nginx:{{ geonode_version }}
+    container_name: geonode_nginx
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "80:80"
+    volumes:
+      - statics:/mnt/volumes/statics
+    depends_on:
+      - django
+    networks:
+      - geonode
+
+  # ------------------------------------------------------------
+  # RabbitMQ (Celery broker)
+  # ------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: geonode_rabbitmq
+    restart: unless-stopped
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: geonode
+      RABBITMQ_DEFAULT_PASS: "{{ postgres_password }}"
+      RABBITMQ_DEFAULT_VHOST: geonode
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - geonode
+
+  # ------------------------------------------------------------
+  # Redis (cache + Celery result backend)
+  # ------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: geonode_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - geonode
+
+  # Alias de rede para o banco externo (montado externamente)
+  db:
+    image: alpine
+    container_name: geonode_db_dummy
+    command: ["sh", "-c", "while true; do sleep 3600; done"]
+    extra_hosts:
+      - "db:{{ ip_db }}"
+    networks:
+      - geonode
+
+volumes:
+  statics:
+  geoserver_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "{{ geoserver_data_dir }}"
+  backup_restore:
+  data:
+  rabbitmq:
+  redis:
+
+networks:
+  geonode:
+    driver: bridge

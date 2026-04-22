@@ -1,0 +1,150 @@
+#---------------------------------------------------------------------
+# haproxy.cfg — Cluster GeoNode/GeoServer
+# Gerenciado pelo Ansible | {{ inventory_hostname }}
+# Gerado em: {{ ansible_date_time.iso8601 }}
+#---------------------------------------------------------------------
+
+global
+    log         /dev/log local0
+    log         /dev/log local1 notice
+    chroot      /var/lib/haproxy
+    stats       socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+    stats       timeout 30s
+    user        haproxy
+    group       haproxy
+    daemon
+
+    # Segurança TLS
+    ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384
+    ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+    ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
+
+    # Performance
+    maxconn 50000
+    tune.ssl.default-dh-param 2048
+
+defaults
+    log     global
+    mode    http
+    option  httplog
+    option  dontlognull
+    option  forwardfor
+    option  http-server-close
+    option  redispatch
+    retries 3
+    timeout connect {{ haproxy_connect_timeout }}
+    timeout client  {{ haproxy_client_timeout }}
+    timeout server  {{ haproxy_server_timeout }}
+    timeout tunnel  3600s
+    timeout http-request 30s
+    timeout http-keep-alive 10s
+    timeout queue 1m
+    errorfile 400 /etc/haproxy/errors/400.http
+    errorfile 403 /etc/haproxy/errors/403.http
+    errorfile 408 /etc/haproxy/errors/408.http
+    errorfile 500 /etc/haproxy/errors/500.http
+    errorfile 502 /etc/haproxy/errors/502.http
+    errorfile 503 /etc/haproxy/errors/503.http
+    errorfile 504 /etc/haproxy/errors/504.http
+
+#---------------------------------------------------------------------
+# Painel de estatísticas
+#---------------------------------------------------------------------
+frontend stats
+    bind *:{{ haproxy_stats_port }}
+    stats enable
+    stats uri /stats
+    stats realm "GeoNode Cluster HAProxy"
+    stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
+    stats refresh 5s
+    stats show-legends
+    stats show-node
+    stats hide-version
+    no log
+
+#---------------------------------------------------------------------
+# Frontend HTTP principal
+#---------------------------------------------------------------------
+frontend http_frontend
+    bind *:{{ haproxy_http_port }}
+
+    # Cabeçalhos de segurança
+    http-response set-header X-Frame-Options SAMEORIGIN
+    http-response set-header X-Content-Type-Options nosniff
+
+    # ACLs — identifica o tipo de requisição
+    acl is_geoserver        path_beg /geoserver
+    acl is_geoserver_admin  path_beg /geoserver/web
+    acl is_geoserver_admin  path_beg /geoserver/j_spring_security
+    acl is_write_method     method   POST PUT DELETE PATCH
+    acl is_wfs_transaction  path_sub -i service=WFS request=Transaction
+    acl is_wcs_write        path_sub -i service=WCS request=Insert
+    acl is_wcs_write        path_sub -i service=WCS request=Delete
+    acl is_wcs_write        path_sub -i service=WCS request=Update
+
+    # Roteamento
+    # Admin e operações de escrita → sempre para o master
+    use_backend geoserver_write if is_geoserver is_geoserver_admin
+    use_backend geoserver_write if is_geoserver is_write_method
+    use_backend geoserver_write if is_geoserver is_wfs_transaction
+    use_backend geoserver_write if is_geoserver is_wcs_write
+    # Leitura GeoServer → workers (round-robin)
+    use_backend geoserver_read  if is_geoserver
+    # Demais → GeoNode
+    default_backend geonode_app
+
+#---------------------------------------------------------------------
+# Backend — GeoServer WRITE (Master)
+# Recebe: admin, POST/PUT/DELETE, WFS-T
+#---------------------------------------------------------------------
+backend geoserver_write
+    balance     roundrobin
+    option      httpchk GET /geoserver/web/ HTTP/1.1\r\nHost:\ localhost
+    http-check  expect status 200
+
+    # Sticky session baseado em cookie JSESSIONID
+    cookie SERVERID insert indirect nocache
+
+    http-request set-header X-Forwarded-Host %[req.hdr(Host)]
+    http-request set-header X-Real-IP       %[src]
+    http-request set-header X-Forwarded-For %[src]
+
+    server geoserver-write {{ ip_geoserver_write }}:{{ geoserver_port }} \
+        check inter 10s fall 3 rise 2 \
+        cookie geoserver-write
+
+#---------------------------------------------------------------------
+# Backend — GeoServer READ (Workers)
+# Recebe: GET WMS/WFS/WCS/WMTS
+#---------------------------------------------------------------------
+backend geoserver_read
+    balance     leastconn
+    option      httpchk GET /geoserver/web/ HTTP/1.1\r\nHost:\ localhost
+    http-check  expect status 200
+
+    http-request set-header X-Forwarded-Host %[req.hdr(Host)]
+    http-request set-header X-Real-IP       %[src]
+    http-request set-header X-Forwarded-For %[src]
+
+    # Fallback para o master se ambos workers estiverem down
+    server geoserver-read-1 {{ ip_geoserver_read_1 }}:{{ geoserver_port }} \
+        check inter 10s fall 3 rise 2 weight 10
+    server geoserver-read-2 {{ ip_geoserver_read_2 }}:{{ geoserver_port }} \
+        check inter 10s fall 3 rise 2 weight 10
+    server geoserver-write-fallback {{ ip_geoserver_write }}:{{ geoserver_port }} \
+        check inter 10s fall 3 rise 2 backup
+
+#---------------------------------------------------------------------
+# Backend — GeoNode (Django/Nginx)
+#---------------------------------------------------------------------
+backend geonode_app
+    balance     leastconn
+    option      httpchk GET /api/v2/ HTTP/1.1\r\nHost:\ localhost
+    http-check  expect status 200
+
+    http-request set-header X-Forwarded-Host %[req.hdr(Host)]
+    http-request set-header X-Real-IP       %[src]
+    http-request set-header X-Forwarded-For %[src]
+
+    # GeoNode roda na porta 80 (Nginx interno do container)
+    server geonode {{ ip_geonode }}:80 check inter 15s fall 3 rise 2

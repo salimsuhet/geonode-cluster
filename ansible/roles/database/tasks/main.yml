@@ -1,0 +1,113 @@
+---
+# roles/database/tasks/main.yml
+
+- name: Instala dependências PostgreSQL
+  apt:
+    name:
+      - postgresql-common
+      - python3-psycopg2
+      - acl
+    state: present
+  tags: [database]
+
+- name: Adiciona repositório PostgreSQL
+  shell: |
+    sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+  args:
+    creates: /etc/apt/sources.list.d/pgdg.list
+  tags: [database]
+
+- name: Instala PostgreSQL {{ postgres_version }} + PostGIS
+  apt:
+    name:
+      - "postgresql-{{ postgres_version }}"
+      - "postgresql-{{ postgres_version }}-postgis-3"
+      - "postgresql-client-{{ postgres_version }}"
+    state: present
+    update_cache: yes
+  tags: [database]
+
+- name: Habilita e inicia PostgreSQL
+  systemd:
+    name: "postgresql@{{ postgres_version }}-main"
+    enabled: yes
+    state: started
+  tags: [database]
+
+- name: Configura postgresql.conf
+  template:
+    src: postgresql.conf.j2
+    dest: "/etc/postgresql/{{ postgres_version }}/main/postgresql.conf"
+    owner: postgres
+    group: postgres
+    mode: '0644'
+  notify: Restart PostgreSQL
+  tags: [database, config]
+
+- name: Configura pg_hba.conf (acesso remoto do cluster)
+  template:
+    src: pg_hba.conf.j2
+    dest: "/etc/postgresql/{{ postgres_version }}/main/pg_hba.conf"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  notify: Reload PostgreSQL
+  tags: [database, config]
+
+- name: Cria usuário PostgreSQL
+  become_user: postgres
+  postgresql_user:
+    name: "{{ postgres_user }}"
+    password: "{{ postgres_password }}"
+    role_attr_flags: CREATEDB,NOCREATEROLE,NOSUPERUSER
+    state: present
+  tags: [database]
+
+- name: Cria banco geonode
+  become_user: postgres
+  postgresql_db:
+    name: "{{ postgres_db }}"
+    owner: "{{ postgres_user }}"
+    encoding: UTF8
+    lc_collate: pt_BR.UTF-8
+    lc_ctype: pt_BR.UTF-8
+    template: template0
+    state: present
+  tags: [database]
+
+- name: Cria banco geonode_data
+  become_user: postgres
+  postgresql_db:
+    name: "{{ postgres_data_db }}"
+    owner: "{{ postgres_user }}"
+    encoding: UTF8
+    lc_collate: pt_BR.UTF-8
+    lc_ctype: pt_BR.UTF-8
+    template: template0
+    state: present
+  tags: [database]
+
+- name: Habilita extensão PostGIS no banco geonode
+  become_user: postgres
+  postgresql_ext:
+    name: "{{ item }}"
+    db: "{{ postgres_db }}"
+    state: present
+  loop:
+    - postgis
+    - postgis_topology
+    - fuzzystrmatch
+    - postgis_tiger_geocoder
+  tags: [database]
+
+- name: Habilita extensão PostGIS no banco geonode_data
+  become_user: postgres
+  postgresql_ext:
+    name: "{{ item }}"
+    db: "{{ postgres_data_db }}"
+    state: present
+  loop:
+    - postgis
+    - postgis_topology
+  tags: [database]

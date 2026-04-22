@@ -1,0 +1,77 @@
+# docker-compose.yml — GeoServer {{ geoserver_role | upper }}
+# Nó: {{ inventory_hostname }}
+# Gerenciado pelo Ansible — não edite manualmente
+
+version: "3.8"
+
+services:
+  geoserver:
+    image: {{ geoserver_image }}
+    container_name: geoserver
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "{{ geoserver_port }}:8080"
+    volumes:
+      - {{ geoserver_data_dir }}:/opt/geoserver/data_dir
+      - {{ geoserver_data_dir }}/plugins:/opt/geoserver/webapps/geoserver/WEB-INF/lib/extra
+      - {{ geoserver_data_dir }}/logs:/opt/geoserver/logs
+    environment:
+      GEOSERVER_DATA_DIR: /opt/geoserver/data_dir
+      GEOWEBCACHE_CACHE_DIR: /opt/geoserver/data_dir/gwc
+      JAVA_OPTS: "{{ geoserver_java_opts }}"
+      CATALINA_OPTS: >-
+        -DGEOSERVER_CSRF_DISABLED=true
+        -Dorg.geoserver.cluster.hazelcast.INSTANCE_NAME={{ geoserver_cluster_instance_name }}
+{% if geoserver_is_master | bool %}
+        -Dorg.geoserver.cluster.hazelcast.IS_MASTER=true
+{% else %}
+        -Dorg.geoserver.cluster.hazelcast.IS_MASTER=false
+        -Dorg.geoserver.cluster.hazelcast.MASTER_ADDRESS={{ ip_geoserver_write }}
+{% endif %}
+        -Dorg.geoserver.cluster.jms.broker={{ geoserver_cluster_broker_url }}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/geoserver/web/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
+    networks:
+      - geoserver_cluster
+
+{% if geoserver_is_master | bool %}
+  # ActiveMQ broker embutido para JMS clustering
+  activemq:
+    image: apache/activemq-classic:5.18.4
+    container_name: activemq
+    restart: unless-stopped
+    ports:
+      - "61616:61616"   # OpenWire (JMS)
+      - "61666:61666"   # OpenWire (externo)
+      - "8161:8161"     # Console admin
+    environment:
+      ACTIVEMQ_ADMIN_LOGIN: admin
+      ACTIVEMQ_ADMIN_PASSWORD: "{{ geoserver_admin_password }}"
+    volumes:
+      - activemq_data:/opt/activemq/data
+    networks:
+      - geoserver_cluster
+    healthcheck:
+      test: ["CMD", "activemq", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  activemq_data:
+{% endif %}
+
+networks:
+  geoserver_cluster:
+    external: true

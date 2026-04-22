@@ -1,0 +1,57 @@
+---
+# roles/keepalived/tasks/main.yml
+# Configura VRRP entre haproxy-1 (MASTER) e haproxy-2 (BACKUP)
+
+- name: Instala Keepalived
+  apt:
+    name: keepalived
+    state: present
+  tags: [keepalived]
+
+- name: Gera configuração Keepalived
+  template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Keepalived
+  tags: [keepalived, config]
+
+- name: Cria script de healthcheck HAProxy
+  copy:
+    dest: /etc/keepalived/check_haproxy.sh
+    content: |
+      #!/bin/bash
+      # Verifica se o HAProxy está respondendo
+      if systemctl is-active --quiet haproxy; then
+        exit 0
+      fi
+      # Tenta reiniciar antes de ceder o VIP
+      systemctl start haproxy
+      sleep 2
+      systemctl is-active --quiet haproxy
+      exit $?
+    mode: '0755'
+  tags: [keepalived]
+
+- name: Habilita e inicia Keepalived
+  systemd:
+    name: keepalived
+    enabled: yes
+    state: started
+  tags: [keepalived]
+
+- name: Verifica VIP no nó MASTER
+  command: "ip addr show {{ keepalived_interface }}"
+  register: vip_check
+  changed_when: false
+  when: keepalived_role == 'MASTER'
+  tags: [keepalived]
+
+- name: Exibe status do VIP
+  debug:
+    msg: >-
+      VIP {{ haproxy_vip }} {{ 'ATIVO neste nó' if haproxy_vip in vip_check.stdout else 'não atribuído (normal em BACKUP)' }}
+  when: keepalived_role == 'MASTER'
+  tags: [keepalived]

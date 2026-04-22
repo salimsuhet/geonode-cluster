@@ -1,0 +1,18 @@
+---
+# playbooks/database.yml
+# Deploy isolado do banco de dados
+# Uso: ansible-playbook -i inventories/vagrant/hosts.yml playbooks/database.yml
+
+- name: Banco de Dados — PostgreSQL {{ postgres_version }} + PostGIS
+  hosts: db
+  tags: [database]
+  vars:
+    locale_gen: "pt_BR.UTF-8"
+  pre_tasks:
+    - name: Gera locale pt_BR
+      locale_gen:
+        name: "{{ locale_gen }}"
+        state: present
+  roles:
+    - role: common
+    - role: database

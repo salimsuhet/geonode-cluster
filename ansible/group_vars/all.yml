@@ -1,0 +1,95 @@
+---
+# =============================================================================
+# group_vars/all.yml — Variáveis globais do cluster
+# Lidas do envs/.env via extra-vars ou defaults abaixo
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# VERSÕES
+# -----------------------------------------------------------------------------
+geonode_version:    "{{ lookup('env', 'GEONODE_VERSION')    | default('5.0.2',          true) }}"
+geoserver_version:  "{{ lookup('env', 'GEOSERVER_VERSION')  | default('2.27.4',         true) }}"
+geoserver_image:    "{{ lookup('env', 'GEOSERVER_IMAGE')    | default('geonode/geoserver:2.27.4-latest', true) }}"
+postgres_version:   "{{ lookup('env', 'POSTGRES_VERSION')   | default('15',             true) }}"
+
+# -----------------------------------------------------------------------------
+# REDE
+# -----------------------------------------------------------------------------
+geonode_hostname:       "{{ lookup('env', 'GEONODE_HOSTNAME')   | default('geonode.local',       true) }}"
+geoserver_hostname:     "{{ lookup('env', 'GEOSERVER_HOSTNAME') | default('geoserver.local',     true) }}"
+haproxy_vip:            "{{ lookup('env', 'HAPROXY_VIP')        | default('192.168.56.50',       true) }}"
+
+ip_db:               "{{ lookup('env', 'IP_DB')               | default('192.168.56.10', true) }}"
+ip_geonode:          "{{ lookup('env', 'IP_GEONODE')          | default('192.168.56.20', true) }}"
+ip_geoserver_write:  "{{ lookup('env', 'IP_GEOSERVER_WRITE')  | default('192.168.56.30', true) }}"
+ip_geoserver_read_1: "{{ lookup('env', 'IP_GEOSERVER_READ_1') | default('192.168.56.31', true) }}"
+ip_geoserver_read_2: "{{ lookup('env', 'IP_GEOSERVER_READ_2') | default('192.168.56.32', true) }}"
+ip_haproxy_1:        "{{ lookup('env', 'IP_HAPROXY_1')        | default('192.168.56.40', true) }}"
+ip_haproxy_2:        "{{ lookup('env', 'IP_HAPROXY_2')        | default('192.168.56.41', true) }}"
+
+# -----------------------------------------------------------------------------
+# BANCO DE DADOS
+# -----------------------------------------------------------------------------
+postgres_user:               "{{ lookup('env', 'POSTGRES_USER')               | default('geonode',   true) }}"
+postgres_password:           "{{ lookup('env', 'POSTGRES_PASSWORD')           | default('changeme',  true) }}"
+postgres_db:                 "{{ lookup('env', 'POSTGRES_DB')                 | default('geonode',   true) }}"
+postgres_data_db:            "{{ lookup('env', 'POSTGRES_DATA_DB')            | default('geonode_data', true) }}"
+postgres_port:               "{{ lookup('env', 'POSTGRES_PORT')               | default('5432',      true) }}"
+postgres_max_connections:    "{{ lookup('env', 'POSTGRES_MAX_CONNECTIONS')    | default('200',       true) }}"
+postgres_shared_buffers:     "{{ lookup('env', 'POSTGRES_SHARED_BUFFERS')     | default('512MB',     true) }}"
+postgres_effective_cache:    "{{ lookup('env', 'POSTGRES_EFFECTIVE_CACHE_SIZE')| default('1536MB',   true) }}"
+postgres_work_mem:           "{{ lookup('env', 'POSTGRES_WORK_MEM')           | default('4MB',       true) }}"
+
+# -----------------------------------------------------------------------------
+# GEONODE
+# -----------------------------------------------------------------------------
+geonode_secret_key:      "{{ lookup('env', 'GEONODE_SECRET_KEY')      | default('CHANGEME_secret',   true) }}"
+geonode_admin_user:      "{{ lookup('env', 'GEONODE_ADMIN_USER')      | default('admin',             true) }}"
+geonode_admin_password:  "{{ lookup('env', 'GEONODE_ADMIN_PASSWORD')  | default('admin',             true) }}"
+geonode_admin_email:     "{{ lookup('env', 'GEONODE_ADMIN_EMAIL')     | default('admin@example.com', true) }}"
+django_debug:            "{{ lookup('env', 'DEBUG')                   | default('False',             true) }}"
+django_allowed_hosts:    "{{ lookup('env', 'DJANGO_ALLOWED_HOSTS')    | default('*',                 true) }}"
+django_time_zone:        "{{ lookup('env', 'TIME_ZONE')               | default('America/Sao_Paulo', true) }}"
+django_language_code:    "{{ lookup('env', 'LANGUAGE_CODE')           | default('pt-br',             true) }}"
+celery_broker_url:       "{{ lookup('env', 'CELERY_BROKER_URL')       | default('amqp://guest:guest@localhost:5672/', true) }}"
+
+# -----------------------------------------------------------------------------
+# GEOSERVER
+# -----------------------------------------------------------------------------
+geoserver_admin_user:     "{{ lookup('env', 'GEOSERVER_ADMIN_USER')     | default('admin',    true) }}"
+geoserver_admin_password: "{{ lookup('env', 'GEOSERVER_ADMIN_PASSWORD') | default('geoserver', true) }}"
+geoserver_port:           "{{ lookup('env', 'GEOSERVER_PORT')           | default('8080',     true) }}"
+geoserver_data_dir:       "{{ lookup('env', 'GEOSERVER_DATA_DIR')       | default('/opt/geoserver_data', true) }}"
+geoserver_java_opts:      "{{ lookup('env', 'GEOSERVER_JAVA_OPTS')      | default('-Xms2g -Xmx4g -XX:+UseG1GC', true) }}"
+
+# NFS
+nfs_server:       "{{ lookup('env', 'NFS_SERVER')      | default(ip_geoserver_write, true) }}"
+nfs_export_path:  "{{ lookup('env', 'NFS_EXPORT_PATH') | default('/opt/geoserver_data', true) }}"
+
+# Clustering JMS
+geoserver_cluster_broker_url:              "{{ lookup('env', 'GEOSERVER_CLUSTER_BROKER_URL')              | default('tcp://' ~ ip_geoserver_write ~ ':61666', true) }}"
+geoserver_cluster_instance_name_write:     "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_WRITE')     | default('geoserver-master',   true) }}"
+geoserver_cluster_instance_name_read_1:    "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_READ_1')    | default('geoserver-worker-1', true) }}"
+geoserver_cluster_instance_name_read_2:    "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_READ_2')    | default('geoserver-worker-2', true) }}"
+
+# Plugins
+geoserver_plugins: "{{ lookup('env', 'GEOSERVER_PLUGINS') | default('jms-cluster,geofence-server,monitor,control-flow', true) }}"
+
+# -----------------------------------------------------------------------------
+# HAPROXY
+# -----------------------------------------------------------------------------
+haproxy_stats_port:     "{{ lookup('env', 'HAPROXY_STATS_PORT')     | default('8404',   true) }}"
+haproxy_stats_user:     "{{ lookup('env', 'HAPROXY_STATS_USER')     | default('admin',  true) }}"
+haproxy_stats_password: "{{ lookup('env', 'HAPROXY_STATS_PASSWORD') | default('changeme', true) }}"
+haproxy_http_port:      "{{ lookup('env', 'HAPROXY_HTTP_PORT')      | default('80',     true) }}"
+haproxy_https_port:     "{{ lookup('env', 'HAPROXY_HTTPS_PORT')     | default('443',    true) }}"
+haproxy_connect_timeout:"{{ lookup('env', 'HAPROXY_CONNECT_TIMEOUT')| default('10s',   true) }}"
+haproxy_client_timeout: "{{ lookup('env', 'HAPROXY_CLIENT_TIMEOUT') | default('60s',   true) }}"
+haproxy_server_timeout: "{{ lookup('env', 'HAPROXY_SERVER_TIMEOUT') | default('60s',   true) }}"
+
+# -----------------------------------------------------------------------------
+# KEEPALIVED
+# -----------------------------------------------------------------------------
+keepalived_vrrp_id:       "{{ lookup('env', 'KEEPALIVED_VRRP_ID')       | default('51',    true) }}"
+keepalived_vrrp_password: "{{ lookup('env', 'KEEPALIVED_VRRP_PASSWORD') | default('changeme', true) }}"
+keepalived_interface:     "{{ lookup('env', 'KEEPALIVED_INTERFACE')     | default('eth1',  true) }}"

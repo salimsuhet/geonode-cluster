@@ -1,0 +1,113 @@
+---
+# playbooks/smoke_tests.yml
+# Testes rápidos de sanidade após o deploy
+# Uso: ansible-playbook -i inventories/vagrant/hosts.yml playbooks/smoke_tests.yml
+
+- name: Smoke Tests — GeoNode Cluster
+  hosts: localhost
+  gather_facts: false
+  vars:
+    vip: "{{ haproxy_vip }}"
+    gs_write_url: "http://{{ ip_geoserver_write }}:{{ geoserver_port }}/geoserver"
+    gs_read1_url:  "http://{{ ip_geoserver_read_1 }}:{{ geoserver_port }}/geoserver"
+    gs_read2_url:  "http://{{ ip_geoserver_read_2 }}:{{ geoserver_port }}/geoserver"
+    geonode_url:   "http://{{ ip_geonode }}"
+    results: []
+
+  tasks:
+    # ── VIP / HAProxy ──────────────────────────────────────────
+    - name: "Teste: VIP responde na porta 80"
+      uri:
+        url: "http://{{ vip }}/"
+        status_code: [200, 301, 302]
+        timeout: 10
+      register: t_vip
+      ignore_errors: true
+
+    - name: "Teste: HAProxy stats em haproxy-1"
+      uri:
+        url: "http://{{ ip_haproxy_1 }}:{{ haproxy_stats_port }}/stats"
+        user: "{{ haproxy_stats_user }}"
+        password: "{{ haproxy_stats_password }}"
+        status_code: 200
+        timeout: 10
+      register: t_haproxy1
+      ignore_errors: true
+
+    - name: "Teste: HAProxy stats em haproxy-2"
+      uri:
+        url: "http://{{ ip_haproxy_2 }}:{{ haproxy_stats_port }}/stats"
+        user: "{{ haproxy_stats_user }}"
+        password: "{{ haproxy_stats_password }}"
+        status_code: 200
+        timeout: 10
+      register: t_haproxy2
+      ignore_errors: true
+
+    # ── GeoServer ─────────────────────────────────────────────
+    - name: "Teste: GeoServer Write healthcheck"
+      uri:
+        url: "{{ gs_write_url }}/web/"
+        status_code: 200
+        timeout: 15
+      register: t_gs_write
+      ignore_errors: true
+
+    - name: "Teste: GeoServer Write — WMS GetCapabilities"
+      uri:
+        url: "{{ gs_write_url }}/ows?service=WMS&version=1.3.0&request=GetCapabilities"
+        status_code: 200
+        timeout: 15
+      register: t_gs_write_wms
+      ignore_errors: true
+
+    - name: "Teste: GeoServer Read-1 healthcheck"
+      uri:
+        url: "{{ gs_read1_url }}/web/"
+        status_code: 200
+        timeout: 15
+      register: t_gs_read1
+      ignore_errors: true
+
+    - name: "Teste: GeoServer Read-2 healthcheck"
+      uri:
+        url: "{{ gs_read2_url }}/web/"
+        status_code: 200
+        timeout: 15
+      register: t_gs_read2
+      ignore_errors: true
+
+    # ── GeoNode ───────────────────────────────────────────────
+    - name: "Teste: GeoNode API v2"
+      uri:
+        url: "{{ geonode_url }}/api/v2/resources/"
+        status_code: [200, 401]
+        timeout: 15
+      register: t_geonode_api
+      ignore_errors: true
+
+    - name: "Teste: GeoNode homepage"
+      uri:
+        url: "{{ geonode_url }}/"
+        status_code: 200
+        timeout: 15
+      register: t_geonode_home
+      ignore_errors: true
+
+    # ── Relatório ─────────────────────────────────────────────
+    - name: "Relatório de smoke tests"
+      debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════════════╗
+          ║  RESULTADO DOS SMOKE TESTS — GeoNode Cluster
+          ╠══════════════════════════════════════════════════════════════╣
+          ║  VIP ({{ vip }}):80              {{ '✔ OK' if t_vip.status in [200,301,302]    else '✗ FALHOU' }}
+          ║  HAProxy-1 stats                 {{ '✔ OK' if t_haproxy1.status == 200         else '✗ FALHOU' }}
+          ║  HAProxy-2 stats                 {{ '✔ OK' if t_haproxy2.status == 200         else '✗ FALHOU' }}
+          ║  GeoServer Write web/            {{ '✔ OK' if t_gs_write.status == 200         else '✗ FALHOU' }}
+          ║  GeoServer Write WMS caps        {{ '✔ OK' if t_gs_write_wms.status == 200     else '✗ FALHOU' }}
+          ║  GeoServer Read-1 web/           {{ '✔ OK' if t_gs_read1.status == 200         else '✗ FALHOU' }}
+          ║  GeoServer Read-2 web/           {{ '✔ OK' if t_gs_read2.status == 200         else '✗ FALHOU' }}
+          ║  GeoNode API v2                  {{ '✔ OK' if t_geonode_api.status in [200,401] else '✗ FALHOU' }}
+          ║  GeoNode homepage                {{ '✔ OK' if t_geonode_home.status == 200     else '✗ FALHOU' }}
+          ╚══════════════════════════════════════════════════════════════╝

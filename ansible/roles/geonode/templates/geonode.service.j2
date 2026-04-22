@@ -1,0 +1,19 @@
+[Unit]
+Description=GeoNode {{ geonode_version }} Application Stack
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/geonode
+ExecStart=/usr/bin/docker compose up
+ExecStop=/usr/bin/docker compose down
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=geonode
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,36 @@
+---
+# playbooks/haproxy.yml
+# Deploy isolado do HAProxy + Keepalived
+# Uso: ansible-playbook -i inventories/vagrant/hosts.yml playbooks/haproxy.yml
+
+- name: HAProxy + Keepalived — Cluster de balanceadores
+  hosts: haproxy
+  tags: [haproxy, keepalived]
+  pre_tasks:
+    - name: Habilita ip_nonlocal_bind para o VIP
+      sysctl:
+        name: net.ipv4.ip_nonlocal_bind
+        value: "1"
+        state: present
+        reload: yes
+  roles:
+    - role: common
+    - role: haproxy
+    - role: keepalived
+  post_tasks:
+    - name: Aguarda HAProxy estabilizar
+      wait_for:
+        port: "{{ haproxy_http_port }}"
+        host: "{{ ansible_host }}"
+        timeout: 30
+
+    - name: Exibe resumo da configuração
+      debug:
+        msg: |
+          ╔══════════════════════════════════════════════╗
+          ║  HAProxy configurado em {{ inventory_hostname }}
+          ║  Papel Keepalived : {{ keepalived_role }}
+          ║  Prioridade VRRP  : {{ keepalived_priority }}
+          ║  VIP              : {{ haproxy_vip }}
+          ║  Stats            : http://{{ ansible_host }}:{{ haproxy_stats_port }}/stats
+          ╚══════════════════════════════════════════════╝

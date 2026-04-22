@@ -1,0 +1,47 @@
+---
+# roles/nfs_server/tasks/main.yml
+# Roda apenas no geoserver-write — exporta o data dir compartilhado
+
+- name: Instala NFS kernel server
+  apt:
+    name: nfs-kernel-server
+    state: present
+  tags: [nfs, nfs_server]
+
+- name: Cria diretório de dados GeoServer
+  file:
+    path: "{{ nfs_export_path }}"
+    state: directory
+    owner: geoserver
+    group: geoserver
+    mode: '0755'
+  tags: [nfs, nfs_server]
+
+- name: Configura exportação NFS
+  template:
+    src: exports.j2
+    dest: /etc/exports
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reload NFS
+  tags: [nfs, nfs_server, config]
+
+- name: Habilita e inicia NFS server
+  systemd:
+    name: nfs-kernel-server
+    enabled: yes
+    state: started
+  tags: [nfs, nfs_server]
+
+- name: Abre porta NFS no firewall (ufw)
+  ufw:
+    rule: allow
+    port: "2049"
+    proto: tcp
+    src: "{{ item }}"
+  loop:
+    - "{{ ip_geoserver_read_1 }}"
+    - "{{ ip_geoserver_read_2 }}"
+  when: ansible_facts.packages['ufw'] is defined
+  tags: [nfs, nfs_server]

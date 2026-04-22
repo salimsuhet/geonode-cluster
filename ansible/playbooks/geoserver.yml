@@ -1,0 +1,36 @@
+---
+# playbooks/geoserver.yml
+# Deploy isolado do cluster GeoServer
+# Uso: ansible-playbook -i inventories/vagrant/hosts.yml playbooks/geoserver.yml
+
+# 1. Servidor NFS (master exporta o data dir)
+- name: GeoServer — NFS Server (Write)
+  hosts: geoserver_write
+  tags: [nfs, nfs_server]
+  roles:
+    - common
+    - docker
+    - nfs_server
+
+# 2. GeoServer Master
+- name: GeoServer — Deploy Master (Write)
+  hosts: geoserver_write
+  tags: [geoserver, geoserver_write]
+  roles:
+    - geoserver
+
+# 3. Clientes NFS (workers montam antes de iniciar)
+- name: GeoServer — NFS Clients (Read)
+  hosts: geoserver_read
+  tags: [nfs, nfs_client]
+  roles:
+    - common
+    - docker
+    - nfs_client
+
+# 4. Workers
+- name: GeoServer — Deploy Workers (Read)
+  hosts: geoserver_read
+  tags: [geoserver, geoserver_read]
+  roles:
+    - geoserver

@@ -1,0 +1,27 @@
+---
+# group_vars/geoserver_write.yml
+# Variáveis exclusivas do nó master (escrita + admin)
+
+geoserver_role: write
+geoserver_is_master: true
+geoserver_cluster_instance_name: "{{ geoserver_cluster_instance_name_write }}"
+
+# O master é também o servidor NFS
+nfs_server_role: true
+nfs_export_path: "{{ geoserver_data_dir }}"
+
+# O master hospeda o broker ActiveMQ embutido
+activemq_port_openwire: 61616
+activemq_port_external: 61666
+activemq_port_console:  8161
+
+# Control-flow: limita WPS e uploads pesados no master
+geoserver_control_flow_config: |
+  # Máximo de requisições simultâneas globais
+  ows.global=100
+  # Limite por IP
+  ows.user=10
+  # Limite para operações WPS (pesadas)
+  ows.wps=5
+  # Timeout de fila (ms)
+  timeout=60000

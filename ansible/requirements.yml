@@ -1,0 +1,13 @@
+---
+# ansible/requirements.yml
+# Instale com: ansible-galaxy install -r ansible/requirements.yml
+
+collections:
+  - name: community.docker
+    version: ">=3.4.0"
+  - name: community.postgresql
+    version: ">=3.2.0"
+  - name: community.general
+    version: ">=7.0.0"
+  - name: ansible.posix
+    version: ">=1.5.0"

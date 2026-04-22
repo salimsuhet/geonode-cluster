@@ -1,0 +1,64 @@
+---
+# =============================================================================
+# inventories/production/hosts.yml.example
+# Copie para hosts.yml e preencha com os IPs/hostnames reais das suas VMs
+# =============================================================================
+
+all:
+  vars:
+    ansible_user: ubuntu           # Usuário SSH nas VMs de produção
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+    ansible_python_interpreter: /usr/bin/python3
+    deploy_env: production
+
+  children:
+
+    db:
+      hosts:
+        db-prod:
+          ansible_host: 10.0.1.10   # ← substitua pelo IP real
+
+    geonode:
+      hosts:
+        geonode-prod:
+          ansible_host: 10.0.1.20
+
+    geoserver_write:
+      hosts:
+        geoserver-write-prod:
+          ansible_host: 10.0.1.30
+          geoserver_role: write
+          geoserver_cluster_instance_name: "{{ geoserver_cluster_instance_name_write }}"
+          geoserver_is_master: true
+          nfs_server_role: true
+
+    geoserver_read:
+      hosts:
+        geoserver-read-1-prod:
+          ansible_host: 10.0.1.31
+          geoserver_role: read
+          geoserver_cluster_instance_name: "{{ geoserver_cluster_instance_name_read_1 }}"
+          geoserver_is_master: false
+          nfs_client_role: true
+        geoserver-read-2-prod:
+          ansible_host: 10.0.1.32
+          geoserver_role: read
+          geoserver_cluster_instance_name: "{{ geoserver_cluster_instance_name_read_2 }}"
+          geoserver_is_master: false
+          nfs_client_role: true
+
+    geoserver:
+      children:
+        geoserver_write:
+        geoserver_read:
+
+    haproxy:
+      hosts:
+        haproxy-1-prod:
+          ansible_host: 10.0.1.40
+          keepalived_role: MASTER
+          keepalived_priority: 101
+        haproxy-2-prod:
+          ansible_host: 10.0.1.41
+          keepalived_role: BACKUP
+          keepalived_priority: 100

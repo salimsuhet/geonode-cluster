@@ -1,0 +1,22 @@
+# cluster.properties — JMS Cluster GeoServer
+# Gerenciado pelo Ansible — {{ inventory_hostname }}
+
+# Identificação da instância
+instanceName={{ geoserver_cluster_instance_name }}
+readOnly={{ 'false' if geoserver_is_master | bool else 'true' }}
+
+# Broker JMS (ActiveMQ no master)
+brokerURL={{ geoserver_cluster_broker_url }}
+
+# Tópico de eventos de configuração
+topicName=VirtualTopic.geoserver
+
+# Durabilidade das mensagens
+durable=true
+
+# Reconexão automática
+reconnectAttempts=10
+reconnectDelay=5000
+
+# Timeout de conexão
+connectionTimeout=30000

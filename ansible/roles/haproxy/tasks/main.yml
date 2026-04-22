@@ -1,0 +1,66 @@
+---
+# roles/haproxy/tasks/main.yml
+
+- name: Instala HAProxy
+  apt:
+    name:
+      - haproxy
+      - socat
+    state: present
+    update_cache: yes
+  tags: [haproxy]
+
+- name: Habilita HAProxy no boot
+  systemd:
+    name: haproxy
+    enabled: yes
+  tags: [haproxy]
+
+- name: Gera configuração HAProxy
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: '0644'
+    validate: 'haproxy -c -f %s'
+  notify: Reload HAProxy
+  tags: [haproxy, config]
+
+- name: Cria diretório de certificados (para HTTPS futuro)
+  file:
+    path: /etc/haproxy/certs
+    state: directory
+    owner: root
+    group: haproxy
+    mode: '0750'
+  tags: [haproxy]
+
+- name: Habilita binding a IPs não locais (para VIP Keepalived)
+  sysctl:
+    name: net.ipv4.ip_nonlocal_bind
+    value: "1"
+    state: present
+    reload: yes
+  tags: [haproxy, keepalived]
+
+- name: Inicia HAProxy
+  systemd:
+    name: haproxy
+    state: started
+  tags: [haproxy]
+
+- name: Verifica status HAProxy
+  uri:
+    url: "http://localhost:{{ haproxy_stats_port }}/stats"
+    status_code: 200
+    timeout: 10
+  register: haproxy_check
+  failed_when: false
+  changed_when: false
+  tags: [haproxy]
+
+- name: Exibe status HAProxy
+  debug:
+    msg: "HAProxy stats: {{ 'OK' if haproxy_check.status == 200 else 'INDISPONÍVEL' }}"
+  tags: [haproxy]
