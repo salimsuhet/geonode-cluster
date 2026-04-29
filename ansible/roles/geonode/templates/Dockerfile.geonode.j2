@@ -1,0 +1,13 @@
+# Dockerfile.geonode — GeoNode {{ geonode_version }} + allauth-govbr
+# Gerenciado pelo Ansible
+#
+# Estende a imagem oficial adicionando o plugin de autenticação Gov.br
+# e Acesso Cidadão ES. Rebuild necessário apenas quando o plugin ou a
+# versão do GeoNode mudar.
+
+FROM geonode/geonode:{{ geonode_version }}
+
+# Instala o plugin a partir do branch geonode-5.0.x
+# Para fixar um commit específico: @<commit-hash>
+RUN pip install --no-cache-dir \
+    "git+https://github.com/salimsuhet/ALLAUTH-GOVBR.git@{{ govbr_plugin_ref | default('geonode-5.0.x') }}#egg=allauth-govbr"

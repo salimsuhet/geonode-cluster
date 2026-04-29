@@ -1,0 +1,57 @@
+"""
+local_settings.py — GeoNode {{ geonode_version }}
+Gerado pelo Ansible. NÃO edite manualmente.
+
+Configurações do plugin allauth-govbr para autenticação via
+Login Único Gov.br e Acesso Cidadão ES.
+"""
+import os
+
+# ── Plugin Gov.br / Acesso Cidadão ES ────────────────────────────────────────
+INSTALLED_APPS += ["allauth_govbr"]
+
+# URLs dos servidores SSO (lidas do .env)
+GOVBR_SSO_BASE_URL = os.environ.get(
+    "GOVBR_SSO_BASE_URL",
+    "{{ govbr_sso_base_url | default('https://sso.acesso.gov.br') }}",
+)
+ACESSOCIDADAO_ES_BASE_URL = os.environ.get(
+    "ACESSOCIDADAO_ES_BASE_URL",
+    "{{ acessocidadao_es_base_url | default('https://acessocidadao.es.gov.br/is') }}",
+)
+
+# Providers
+SOCIALACCOUNT_PROVIDERS = {
+    "govbr": {
+        "SCOPE": {{ govbr_scope | default(['openid', 'email', 'profile']) | tojson }},
+        "APP": {
+            "client_id": os.environ.get("GOVBR_CLIENT_ID", ""),
+            "secret":    os.environ.get("GOVBR_CLIENT_SECRET", ""),
+            "key":       "",
+        },
+    },
+    "acessocidadaoes": {
+        "SCOPE": {{ aces_scope | default(['openid', 'profile', 'email', 'agentepublico']) | tojson }},
+        "APP": {
+            "client_id": os.environ.get("ACES_CLIENT_ID", ""),
+            "secret":    os.environ.get("ACES_CLIENT_SECRET", ""),
+            "key":       "",
+        },
+    },
+}
+
+# Adapters
+SOCIALACCOUNT_ADAPTER = "allauth_govbr.adapter.GovIdentityAccountAdapter"
+ACCOUNT_ADAPTER      = "geonode.people.adapters.LocalAccountAdapter"
+
+# Extractors de perfil
+SOCIALACCOUNT_PROFILE_EXTRACTORS = {
+    "govbr":           "allauth_govbr.extractors.GovBrExtractor",
+    "acessocidadaoes": "allauth_govbr.extractors.AcessoCidadaoExtractor",
+}
+
+# Comportamento de registro
+SOCIALACCOUNT_AUTO_SIGNUP   = False
+ACCOUNT_EMAIL_REQUIRED      = True
+ACCOUNT_APPROVAL_REQUIRED   = {{ account_approval_required | default(True) | tojson }}
+ACCOUNT_EMAIL_VERIFICATION  = "optional"

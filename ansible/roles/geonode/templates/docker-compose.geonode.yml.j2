@@ -8,7 +8,7 @@ services:
   # Django + uWSGI
   # ------------------------------------------------------------
   django:
-    image: geonode/geonode:{{ geonode_version }}
+    image: {% if govbr_client_id is defined and govbr_client_id %}geonode-govbr:{{ geonode_version }}{% else %}geonode/geonode:{{ geonode_version }}{% endif %}
     container_name: geonode_django
     restart: unless-stopped
     env_file: .env
@@ -38,7 +38,7 @@ services:
   # Celery Worker
   # ------------------------------------------------------------
   celery:
-    image: geonode/geonode:{{ geonode_version }}
+    image: {% if govbr_client_id is defined and govbr_client_id %}geonode-govbr:{{ geonode_version }}{% else %}geonode/geonode:{{ geonode_version }}{% endif %}
     container_name: geonode_celery
     restart: unless-stopped
     env_file: .env
@@ -59,7 +59,7 @@ services:
   # Celery Beat (tarefas agendadas)
   # ------------------------------------------------------------
   celerybeat:
-    image: geonode/geonode:{{ geonode_version }}
+    image: {% if govbr_client_id is defined and govbr_client_id %}geonode-govbr:{{ geonode_version }}{% else %}geonode/geonode:{{ geonode_version }}{% endif %}
     container_name: geonode_celerybeat
     restart: unless-stopped
     env_file: .env

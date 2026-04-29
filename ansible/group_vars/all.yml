@@ -100,3 +100,23 @@ haproxy_server_timeout: "{{ lookup('env', 'HAPROXY_SERVER_TIMEOUT') | default('6
 keepalived_vrrp_id:       "{{ lookup('env', 'KEEPALIVED_VRRP_ID')       | default('51',    true) }}"
 keepalived_vrrp_password: "{{ lookup('env', 'KEEPALIVED_VRRP_PASSWORD') | default('changeme', true) }}"
 keepalived_interface:     "{{ lookup('env', 'KEEPALIVED_INTERFACE')     | default('eth1',  true) }}"
+
+# -----------------------------------------------------------------------------
+# GOV.BR / ACESSO CIDADÃO ES  (allauth-govbr plugin)
+# Deixe govbr_client_id vazio para desabilitar o plugin.
+# -----------------------------------------------------------------------------
+govbr_client_id:       "{{ lookup('env', 'GOVBR_CLIENT_ID')       | default('', true) }}"
+govbr_client_secret:   "{{ lookup('env', 'GOVBR_CLIENT_SECRET')   | default('', true) }}"
+govbr_sso_base_url:    "{{ lookup('env', 'GOVBR_SSO_BASE_URL')    | default('https://sso.acesso.gov.br', true) }}"
+
+aces_client_id:              "{{ lookup('env', 'ACES_CLIENT_ID')              | default('', true) }}"
+aces_client_secret:          "{{ lookup('env', 'ACES_CLIENT_SECRET')          | default('', true) }}"
+acessocidadao_es_base_url:   "{{ lookup('env', 'ACESSOCIDADAO_ES_BASE_URL')   | default('https://acessocidadao.es.gov.br/is', true) }}"
+
+# Referência do branch/commit do plugin (padrão: branch geonode-5.0.x)
+govbr_plugin_ref:  "{{ lookup('env', 'GOVBR_PLUGIN_REF') | default('geonode-5.0.x', true) }}"
+# Força rebuild da imagem Docker mesmo sem alteração de Dockerfile
+govbr_force_rebuild: false
+
+# Exige aprovação de admin antes do primeiro login via SSO gov
+account_approval_required: true

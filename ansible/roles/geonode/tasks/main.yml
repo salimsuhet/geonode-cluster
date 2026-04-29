@@ -14,6 +14,39 @@
     - /opt/geonode/backup
   tags: [geonode]
 
+
+# ── allauth-govbr: build imagem customizada ──────────────────────────────────
+
+- name: Copia Dockerfile do GeoNode com plugin Gov.br
+  template:
+    src: Dockerfile.geonode.j2
+    dest: /opt/geonode/Dockerfile
+    mode: '0644'
+  when: govbr_client_id is defined and govbr_client_id
+  tags: [geonode, govbr]
+
+- name: Build imagem GeoNode com plugin Gov.br
+  community.docker.docker_image:
+    name: "geonode-govbr:{{ geonode_version }}"
+    build:
+      path: /opt/geonode
+      dockerfile: Dockerfile
+      pull: true
+    source: build
+    force_source: "{{ govbr_force_rebuild | default(false) }}"
+  when: govbr_client_id is defined and govbr_client_id
+  notify: Restart GeoNode
+  tags: [geonode, govbr]
+
+- name: Implanta local_settings.py com configuração Gov.br
+  template:
+    src: local_settings.py.j2
+    dest: /opt/geonode/local_settings.py
+    mode: '0600'
+  when: govbr_client_id is defined and govbr_client_id
+  notify: Restart GeoNode
+  tags: [geonode, govbr, config]
+
 - name: Copia docker-compose do GeoNode
   template:
     src: docker-compose.geonode.yml.j2
@@ -67,6 +100,23 @@
   register: migrate_result
   changed_when: "'No migrations to apply' not in migrate_result.stdout"
   tags: [geonode, migrate]
+
+
+- name: Aplica migration do campo CPF (allauth-govbr)
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: >
+      sh -c "python manage.py shell -c \"
+      from django.db import connection;
+      cols = [c.name for c in connection.introspection.get_table_description(connection.cursor(), 'people_profile')];
+      print('CPF OK' if 'cpf' in cols else 'CPF MISSING')
+      \" | grep -q 'CPF MISSING' &&
+      python manage.py migrate people --noinput ||
+      echo 'Campo CPF já existe, ignorando'"
+    user: geonode
+  when: govbr_client_id is defined and govbr_client_id
+  changed_when: false
+  tags: [geonode, govbr, migrate]
 
 - name: Cria superusuário GeoNode
   community.docker.docker_container_exec:
