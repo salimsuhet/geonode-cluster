@@ -7,15 +7,40 @@
       - postgresql-common
       - python3-psycopg2
       - acl
+      - wget
+      - curl
     state: present
   tags: [database]
 
+# ── Locale pt_BR.UTF-8 obrigatório antes de criar os bancos ──────────────────
+- name: Gera locale pt_BR.UTF-8
+  locale_gen:
+    name: pt_BR.UTF-8
+    state: present
+  tags: [database]
+
+# ── Repositório PostgreSQL (apt-key add removido no Ubuntu 24.04) ─────────────
+- name: Cria diretório /etc/apt/keyrings
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  tags: [database]
+
+- name: Baixa GPG key do PostgreSQL
+  get_url:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    dest: /etc/apt/keyrings/postgresql.asc
+    mode: '0644'
+    force: false
+  tags: [database]
+
 - name: Adiciona repositório PostgreSQL
-  shell: |
-    sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
-  args:
-    creates: /etc/apt/sources.list.d/pgdg.list
+  apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/postgresql.asc] https://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+    state: present
+    filename: pgdg
+    update_cache: yes
   tags: [database]
 
 - name: Instala PostgreSQL {{ postgres_version }} + PostGIS
@@ -25,7 +50,6 @@
       - "postgresql-{{ postgres_version }}-postgis-3"
       - "postgresql-client-{{ postgres_version }}"
     state: present
-    update_cache: yes
   tags: [database]
 
 - name: Habilita e inicia PostgreSQL

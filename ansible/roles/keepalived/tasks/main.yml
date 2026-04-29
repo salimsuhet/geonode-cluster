@@ -8,6 +8,23 @@
     state: present
   tags: [keepalived]
 
+# ── Detecta interface de rede privada automaticamente ─────────────────────────
+# No Ubuntu 24.04 a nomenclatura é enp0s8 / ens6, não eth1
+- name: Detecta interface de rede privada (fallback se keepalived_interface=eth1)
+  set_fact:
+    keepalived_interface: >-
+      {{ ansible_interfaces
+         | reject('equalto', 'lo')
+         | select('match', '^(eth|enp|ens)')
+         | list | last }}
+  when: keepalived_interface == 'eth1' and ansible_interfaces is defined
+  tags: [keepalived]
+
+- name: Exibe interface selecionada para o Keepalived
+  debug:
+    msg: "Interface Keepalived: {{ keepalived_interface }}"
+  tags: [keepalived]
+
 - name: Gera configuração Keepalived
   template:
     src: keepalived.conf.j2
@@ -23,11 +40,9 @@
     dest: /etc/keepalived/check_haproxy.sh
     content: |
       #!/bin/bash
-      # Verifica se o HAProxy está respondendo
       if systemctl is-active --quiet haproxy; then
         exit 0
       fi
-      # Tenta reiniciar antes de ceder o VIP
       systemctl start haproxy
       sleep 2
       systemctl is-active --quiet haproxy
@@ -52,6 +67,7 @@
 - name: Exibe status do VIP
   debug:
     msg: >-
-      VIP {{ haproxy_vip }} {{ 'ATIVO neste nó' if haproxy_vip in vip_check.stdout else 'não atribuído (normal em BACKUP)' }}
+      VIP {{ haproxy_vip }}
+      {{ 'ATIVO neste nó' if haproxy_vip in vip_check.stdout else 'não atribuído (normal em BACKUP)' }}
   when: keepalived_role == 'MASTER'
   tags: [keepalived]

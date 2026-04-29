@@ -4,25 +4,37 @@
 - name: Instala dependências do Docker
   apt:
     name:
-      - apt-transport-https
       - ca-certificates
       - curl
       - gnupg
       - lsb-release
+      # apt-transport-https integrado ao apt desde Ubuntu 18.04 — desnecessário
     state: present
   tags: [docker]
 
-- name: Adiciona GPG key do Docker
-  apt_key:
+- name: Cria diretório /etc/apt/keyrings
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  tags: [docker]
+
+- name: Baixa GPG key do Docker (apt_key depreciado no Ubuntu 24.04)
+  get_url:
     url: https://download.docker.com/linux/ubuntu/gpg
-    state: present
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+    force: false
   tags: [docker]
 
 - name: Adiciona repositório Docker
   apt_repository:
-    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    repo: >-
+      deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
     state: present
     filename: docker
+    update_cache: yes
   tags: [docker]
 
 - name: Instala Docker Engine
@@ -34,7 +46,6 @@
       - docker-buildx-plugin
       - docker-compose-plugin
     state: present
-    update_cache: yes
   tags: [docker]
 
 - name: Habilita e inicia serviço Docker

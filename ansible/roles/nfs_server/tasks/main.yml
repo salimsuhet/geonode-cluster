@@ -34,6 +34,14 @@
     state: started
   tags: [nfs, nfs_server]
 
+# ── Firewall ufw (guard corrigido: verifica serviço, não packages fact) ────────
+- name: Verifica se ufw está ativo
+  command: ufw status
+  register: ufw_status
+  changed_when: false
+  failed_when: false
+  tags: [nfs, nfs_server]
+
 - name: Abre porta NFS no firewall (ufw)
   ufw:
     rule: allow
@@ -43,5 +51,5 @@
   loop:
     - "{{ ip_geoserver_read_1 }}"
     - "{{ ip_geoserver_read_2 }}"
-  when: ansible_facts.packages['ufw'] is defined
+  when: "'active' in ufw_status.stdout"
   tags: [nfs, nfs_server]
