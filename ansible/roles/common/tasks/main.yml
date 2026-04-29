@@ -85,6 +85,8 @@
       - nfs-common
       - python3-pip
       - python3-apt
+      - python3-venv
+      - python3-full
       - ca-certificates
       - gnupg
       - lsb-release
