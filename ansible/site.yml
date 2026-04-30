@@ -7,6 +7,7 @@
 # 1. Setup base em todas as VMs
 - name: Common — Setup base
   hosts: all
+  become: true
   tags: [common]
   roles:
     - common
@@ -14,6 +15,7 @@
 # 2. Instala Docker em todos os nós que precisam (exceto haproxy e db)
 - name: Docker — Instala engine
   hosts: geonode, geoserver
+  become: true
   tags: [docker]
   roles:
     - docker
@@ -21,6 +23,7 @@
 # 3. Banco de dados
 - name: Database — PostgreSQL + PostGIS
   hosts: db
+  become: true
   tags: [database]
   roles:
     - database
@@ -28,6 +31,7 @@
 # 4. NFS — Servidor (geoserver-write exporta o data dir)
 - name: NFS Server — GeoServer data dir
   hosts: geoserver_write
+  become: true
   tags: [nfs, nfs_server]
   roles:
     - nfs_server
@@ -35,6 +39,7 @@
 # 5. NFS — Clientes (workers montam o data dir do master)
 - name: NFS Client — Monta data dir compartilhado
   hosts: geoserver_read
+  become: true
   tags: [nfs, nfs_client]
   roles:
     - nfs_client
@@ -42,6 +47,7 @@
 # 6. GeoServer Write (Master)
 - name: GeoServer — Master (Write)
   hosts: geoserver_write
+  become: true
   tags: [geoserver, geoserver_write]
   roles:
     - geoserver
@@ -49,6 +55,7 @@
 # 7. GeoServer Read (Workers) — após o master estar UP
 - name: GeoServer — Workers (Read)
   hosts: geoserver_read
+  become: true
   tags: [geoserver, geoserver_read]
   roles:
     - geoserver
@@ -56,6 +63,7 @@
 # 8. GeoNode
 - name: GeoNode — Aplicação
   hosts: geonode
+  become: true
   tags: [geonode]
   roles:
     - geonode
@@ -63,6 +71,7 @@
 # 9. HAProxy
 - name: HAProxy — Load Balancer
   hosts: haproxy
+  become: true
   tags: [haproxy]
   roles:
     - haproxy
@@ -70,6 +79,7 @@
 # 10. Keepalived — VIP entre os dois HAProxy
 - name: Keepalived — Alta disponibilidade HAProxy
   hosts: haproxy
+  become: true
   tags: [keepalived]
   roles:
     - keepalived
