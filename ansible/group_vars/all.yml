@@ -90,7 +90,7 @@ haproxy_stats_user:     "{{ lookup('env', 'HAPROXY_STATS_USER')     | default('a
 haproxy_stats_password: "{{ lookup('env', 'HAPROXY_STATS_PASSWORD') | default('changeme', true) }}"
 haproxy_http_port:      "{{ lookup('env', 'HAPROXY_HTTP_PORT')      | default('80',     true) }}"
 haproxy_https_port:     "{{ lookup('env', 'HAPROXY_HTTPS_PORT')     | default('443',    true) }}"
-haproxy_connect_timeout:"{{ lookup('env', 'HAPROXY_CONNECT_TIMEOUT')| default('10s',   true) }}"
+haproxy_connect_timeout: "{{ lookup('env', 'HAPROXY_CONNECT_TIMEOUT')| default('10s',   true) }}"
 haproxy_client_timeout: "{{ lookup('env', 'HAPROXY_CLIENT_TIMEOUT') | default('60s',   true) }}"
 haproxy_server_timeout: "{{ lookup('env', 'HAPROXY_SERVER_TIMEOUT') | default('60s',   true) }}"
 
