@@ -6,11 +6,19 @@ local   all             postgres                                peer
 local   all             all                                     md5
 
 # Acesso remoto — nós do cluster
+# GeoNode app
 host    {{ postgres_db }}       {{ postgres_user }}   {{ ip_geonode }}/32          md5
 host    {{ postgres_data_db }}  {{ postgres_user }}   {{ ip_geonode }}/32          md5
+
+# GeoServer write (master) — precisa de ambos os bancos
 host    {{ postgres_db }}       {{ postgres_user }}   {{ ip_geoserver_write }}/32  md5
+host    {{ postgres_data_db }}  {{ postgres_user }}   {{ ip_geoserver_write }}/32  md5
+
+# GeoServer read workers — precisam de ambos os bancos
 host    {{ postgres_db }}       {{ postgres_user }}   {{ ip_geoserver_read_1 }}/32 md5
+host    {{ postgres_data_db }}  {{ postgres_user }}   {{ ip_geoserver_read_1 }}/32 md5
 host    {{ postgres_db }}       {{ postgres_user }}   {{ ip_geoserver_read_2 }}/32 md5
+host    {{ postgres_data_db }}  {{ postgres_user }}   {{ ip_geoserver_read_2 }}/32 md5
 
 # Replicação (caso precise no futuro)
 # host    replication     postgres        samenet                 md5
