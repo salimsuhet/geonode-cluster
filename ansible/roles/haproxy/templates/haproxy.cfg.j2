@@ -99,7 +99,8 @@ frontend http_frontend
 #---------------------------------------------------------------------
 backend geoserver_write
     balance     roundrobin
-    option      httpchk GET /geoserver/web/ HTTP/1.1\r\nHost:\ localhost
+    option      httpchk
+    http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host localhost
     http-check  expect status 200
 
     # Sticky session baseado em cookie JSESSIONID
@@ -109,9 +110,7 @@ backend geoserver_write
     http-request set-header X-Real-IP       %[src]
     http-request set-header X-Forwarded-For %[src]
 
-    server geoserver-write {{ ip_geoserver_write }}:{{ geoserver_port }} \
-        check inter 10s fall 3 rise 2 \
-        cookie geoserver-write
+    server geoserver-write {{ ip_geoserver_write }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 cookie geoserver-write
 
 #---------------------------------------------------------------------
 # Backend — GeoServer READ (Workers)
@@ -119,7 +118,8 @@ backend geoserver_write
 #---------------------------------------------------------------------
 backend geoserver_read
     balance     leastconn
-    option      httpchk GET /geoserver/web/ HTTP/1.1\r\nHost:\ localhost
+    option      httpchk
+    http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host localhost
     http-check  expect status 200
 
     http-request set-header X-Forwarded-Host %[req.hdr(Host)]
@@ -127,19 +127,17 @@ backend geoserver_read
     http-request set-header X-Forwarded-For %[src]
 
     # Fallback para o master se ambos workers estiverem down
-    server geoserver-read-1 {{ ip_geoserver_read_1 }}:{{ geoserver_port }} \
-        check inter 10s fall 3 rise 2 weight 10
-    server geoserver-read-2 {{ ip_geoserver_read_2 }}:{{ geoserver_port }} \
-        check inter 10s fall 3 rise 2 weight 10
-    server geoserver-write-fallback {{ ip_geoserver_write }}:{{ geoserver_port }} \
-        check inter 10s fall 3 rise 2 backup
+    server geoserver-read-1 {{ ip_geoserver_read_1 }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 weight 10
+    server geoserver-read-2 {{ ip_geoserver_read_2 }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 weight 10
+    server geoserver-write-fallback {{ ip_geoserver_write }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 backup
 
 #---------------------------------------------------------------------
 # Backend — GeoNode (Django/Nginx)
 #---------------------------------------------------------------------
 backend geonode_app
     balance     leastconn
-    option      httpchk GET /api/v2/ HTTP/1.1\r\nHost:\ localhost
+    option      httpchk
+    http-check  send meth GET uri /api/v2/ ver HTTP/1.1 hdr Host localhost
     http-check  expect status 200
 
     http-request set-header X-Forwarded-Host %[req.hdr(Host)]
