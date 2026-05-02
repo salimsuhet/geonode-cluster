@@ -65,7 +65,6 @@
   community.docker.docker_container_exec:
     container: geonode_django
     command: python manage.py migrate --noinput
-    user: geonode
   register: migrate_result
   changed_when: "'No migrations to apply' not in migrate_result.stdout"
   tags: [geonode, migrate]
