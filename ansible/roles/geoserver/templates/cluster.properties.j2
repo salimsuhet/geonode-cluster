@@ -2,7 +2,13 @@
 # Gerenciado pelo Ansible — {{ inventory_hostname }}
 
 # Identificação da instância
-instanceName={{ geoserver_cluster_instance_name }}
+{% if geoserver_is_master | bool %}
+instanceName={{ geoserver_cluster_instance_name_write }}
+{% elif inventory_hostname == 'geoserver-read-1' %}
+instanceName={{ geoserver_cluster_instance_name_read_1 }}
+{% else %}
+instanceName={{ geoserver_cluster_instance_name_read_2 }}
+{% endif %}
 readOnly={{ 'false' if geoserver_is_master | bool else 'true' }}
 
 # Broker JMS (ActiveMQ no master)
