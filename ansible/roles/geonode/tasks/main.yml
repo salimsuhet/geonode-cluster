@@ -122,16 +122,9 @@
 - name: Cria superusuário GeoNode
   community.docker.docker_container_exec:
     container: geonode_django
-    command: >
-      python manage.py shell -c "
-      from django.contrib.auth import get_user_model;
-      User = get_user_model();
-      User.objects.filter(username='{{ geonode_admin_user }}').exists() or
-      User.objects.create_superuser(
-        '{{ geonode_admin_user }}',
-        '{{ geonode_admin_email }}',
-        '{{ geonode_admin_password }}'
-      )"
+    command: >-
+      python manage.py shell -c
+      "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='{{ geonode_admin_user }}').exists() or User.objects.create_superuser('{{ geonode_admin_user }}', '{{ geonode_admin_email }}', '{{ geonode_admin_password }}')"
   changed_when: false
   tags: [geonode, users]
 
