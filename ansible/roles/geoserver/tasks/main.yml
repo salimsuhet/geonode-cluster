@@ -140,10 +140,11 @@
 - name: Aguarda GeoServer responder (até 5 minutos)
   uri:
     url: "http://localhost:{{ geoserver_port }}/geoserver/web/"
-    status_code: 200
+    status_code: [200, 302]
     timeout: 10
   register: gs_health
-  until: gs_health.status == 200
+  until: gs_health.status in [200, 302]
   retries: 30
   delay: 10
+  when: geoserver_is_master | bool
   tags: [geoserver]
