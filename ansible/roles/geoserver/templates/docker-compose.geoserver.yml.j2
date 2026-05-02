@@ -2,7 +2,6 @@
 # Nó: {{ inventory_hostname }}
 # Gerenciado pelo Ansible — não edite manualmente
 
-
 services:
   geoserver:
     image: {{ geoserver_image }}
@@ -17,19 +16,23 @@ services:
       - {{ geoserver_data_dir }}/plugins:/opt/geoserver/webapps/geoserver/WEB-INF/lib/extra
       - {{ geoserver_data_dir }}/logs:/opt/geoserver/logs
     environment:
+      # Estes sobrescrevem o .env intencionalmente para garantir os valores corretos
       GEOSERVER_DATA_DIR: /opt/geoserver/data_dir
       GEOWEBCACHE_CACHE_DIR: /opt/geoserver/data_dir/gwc
+      # JAVA_OPTS em uma linha só — docker-compose não tem o problema do .env com multilinha
       JAVA_OPTS: "{{ geoserver_java_opts }}"
       CATALINA_OPTS: >-
         -DGEOSERVER_CSRF_DISABLED=true
-        -Dorg.geoserver.cluster.hazelcast.INSTANCE_NAME={{ geoserver_cluster_instance_name }}
 {% if geoserver_is_master | bool %}
+        -Dorg.geoserver.cluster.hazelcast.INSTANCE_NAME={{ geoserver_cluster_instance_name_write }}
         -Dorg.geoserver.cluster.hazelcast.IS_MASTER=true
+        -Dorg.geoserver.cluster.jms.broker={{ geoserver_cluster_broker_url }}
 {% else %}
+        -Dorg.geoserver.cluster.hazelcast.INSTANCE_NAME={{ geoserver_cluster_instance_name_read_1 if inventory_hostname == 'geoserver-read-1' else geoserver_cluster_instance_name_read_2 }}
         -Dorg.geoserver.cluster.hazelcast.IS_MASTER=false
         -Dorg.geoserver.cluster.hazelcast.MASTER_ADDRESS={{ ip_geoserver_write }}
-{% endif %}
         -Dorg.geoserver.cluster.jms.broker={{ geoserver_cluster_broker_url }}
+{% endif %}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/geoserver/web/"]
       interval: 30s
@@ -45,14 +48,14 @@ services:
       - geoserver_cluster
 
 {% if geoserver_is_master | bool %}
-  # ActiveMQ broker embutido para JMS clustering
+  # ActiveMQ broker — apenas no master (write)
   activemq:
     image: apache/activemq-classic:5.18.4
     container_name: activemq
     restart: unless-stopped
     ports:
-      - "61616:61616"   # OpenWire (JMS)
-      - "61666:61666"   # OpenWire (externo)
+      - "61616:61616"   # OpenWire (JMS interno)
+      - "61666:61666"   # OpenWire (acesso externo dos workers)
       - "8161:8161"     # Console admin
     environment:
       ACTIVEMQ_ADMIN_LOGIN: admin
@@ -62,13 +65,15 @@ services:
     networks:
       - geoserver_cluster
     healthcheck:
-      test: ["CMD", "activemq", "status"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8161/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
+      start_period: 30s
 
 volumes:
   activemq_data:
+
 {% endif %}
 
 networks:
