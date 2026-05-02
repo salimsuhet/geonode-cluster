@@ -1,25 +1,56 @@
 ---
 # roles/geoserver/tasks/plugins.yml
 # Baixa e posiciona plugins no data dir (roda apenas no master)
+#
+# Dois repositórios de distribuição:
+#
+#   SourceForge   → extensões oficiais (geofence-server, control-flow, monitor)
+#                   URL: .../GeoServer/<version>/extensions/geoserver-<version>-<plugin>-plugin.zip
+#
+#   Nightly builds → módulos comunitários (jms-cluster a partir de 2.27)
+#                    URL: .../geoserver/<major.minor>.x/community-latest/
+#                         geoserver-<major.minor>-SNAPSHOT-<plugin>-plugin.zip
+#
+# geofence-server: extensão oficial, mas o arquivo tem sufixo obrigatório de backend:
+#   -postgres  → recomendado para produção (usa PostgreSQL externo)
+#   -h2        → apenas para testes (banco embarcado, incompatível com outros plugins H2)
+# Controlado pela variável: geofence_backend (default: postgres)
 
 - name: Define lista de plugins a instalar
   set_fact:
     plugin_list: "{{ geoserver_plugins.split(',') | map('trim') | list }}"
 
-- name: Define base URL dos plugins GeoServer
+# Extrai "2.27" de "2.27.4" para montar a URL dos nightly builds
+- name: Define versão minor do GeoServer (major.minor)
   set_fact:
-    gs_plugins_base_url: "https://sourceforge.net/projects/geoserver/files/GeoServer/{{ geoserver_version }}/extensions"
+    geoserver_version_minor: "{{ geoserver_version.split('.')[:2] | join('.') }}"
 
-- name: Cria diretório de plugins no data dir
+- name: Define base URL — extensões oficiais (SourceForge)
+  set_fact:
+    gs_ext_base_url: "https://sourceforge.net/projects/geoserver/files/GeoServer/{{ geoserver_version }}/extensions"
+
+- name: Define base URL — módulos comunitários (nightly builds)
+  set_fact:
+    gs_community_base_url: "https://build.geoserver.org/geoserver/{{ geoserver_version_minor }}.x/community-latest"
+
+- name: Define backend do geofence-server
+  set_fact:
+    geofence_backend: "{{ geofence_backend | default('postgres') }}"
+
+- name: Cria diretório de plugins
   file:
-    path: "{{ geoserver_data_dir }}/plugins"
+    path: /opt/geoserver/plugins
     state: directory
     owner: geoserver
     mode: '0755'
 
-- name: Baixa plugin jms-cluster (clustering obrigatório)
+# ------------------------------------------------------------------
+# MÓDULOS COMUNITÁRIOS — nightly builds
+# ------------------------------------------------------------------
+
+- name: Baixa plugin jms-cluster (módulo comunitário — clustering obrigatório)
   get_url:
-    url: "{{ gs_plugins_base_url }}/geoserver-{{ geoserver_version }}-jms-cluster-plugin.zip"
+    url: "{{ gs_community_base_url }}/geoserver-{{ geoserver_version_minor }}-SNAPSHOT-jms-cluster-plugin.zip"
     dest: "/opt/geoserver/plugins/jms-cluster.zip"
     owner: geoserver
     mode: '0644'
@@ -35,15 +66,25 @@
     dest: "{{ geoserver_data_dir }}/plugins/"
     remote_src: yes
     owner: geoserver
-  when: dl_jms is changed or dl_jms is succeeded
+  when:
+    - "'jms-cluster' in plugin_list"
+    - dl_jms is not failed
 
-- name: Baixa plugin geofence-server
+# ------------------------------------------------------------------
+# EXTENSÕES OFICIAIS — SourceForge
+# ------------------------------------------------------------------
+
+# geofence-server: o nome do arquivo inclui o sufixo do backend escolhido.
+# Para produção com PostgreSQL: geofence_backend = postgres
+# Para testes rápidos sem configuração: geofence_backend = h2
+- name: "Baixa plugin geofence-server (extensão oficial — backend {{ geofence_backend }})"
   get_url:
-    url: "{{ gs_plugins_base_url }}/geoserver-{{ geoserver_version }}-geofence-server-plugin.zip"
+    url: "{{ gs_ext_base_url }}/geoserver-{{ geoserver_version }}-geofence-server-{{ geofence_backend }}-plugin.zip"
     dest: "/opt/geoserver/plugins/geofence-server.zip"
     owner: geoserver
     mode: '0644'
     timeout: 120
+  register: dl_geofence
   retries: 3
   delay: 10
   when: "'geofence-server' in plugin_list"
@@ -54,15 +95,18 @@
     dest: "{{ geoserver_data_dir }}/plugins/"
     remote_src: yes
     owner: geoserver
-  when: "'geofence-server' in plugin_list"
+  when:
+    - "'geofence-server' in plugin_list"
+    - dl_geofence is not failed
 
-- name: Baixa plugin control-flow
+- name: Baixa plugin control-flow (extensão oficial)
   get_url:
-    url: "{{ gs_plugins_base_url }}/geoserver-{{ geoserver_version }}-control-flow-plugin.zip"
+    url: "{{ gs_ext_base_url }}/geoserver-{{ geoserver_version }}-control-flow-plugin.zip"
     dest: "/opt/geoserver/plugins/control-flow.zip"
     owner: geoserver
     mode: '0644'
     timeout: 120
+  register: dl_control_flow
   retries: 3
   delay: 10
   when: "'control-flow' in plugin_list"
@@ -73,15 +117,18 @@
     dest: "{{ geoserver_data_dir }}/plugins/"
     remote_src: yes
     owner: geoserver
-  when: "'control-flow' in plugin_list"
+  when:
+    - "'control-flow' in plugin_list"
+    - dl_control_flow is not failed
 
-- name: Baixa plugin monitor
+- name: Baixa plugin monitor (extensão oficial)
   get_url:
-    url: "{{ gs_plugins_base_url }}/geoserver-{{ geoserver_version }}-monitor-plugin.zip"
+    url: "{{ gs_ext_base_url }}/geoserver-{{ geoserver_version }}-monitor-plugin.zip"
     dest: "/opt/geoserver/plugins/monitor.zip"
     owner: geoserver
     mode: '0644'
     timeout: 120
+  register: dl_monitor
   retries: 3
   delay: 10
   when: "'monitor' in plugin_list"
@@ -92,4 +139,6 @@
     dest: "{{ geoserver_data_dir }}/plugins/"
     remote_src: yes
     owner: geoserver
-  when: "'monitor' in plugin_list"
+  when:
+    - "'monitor' in plugin_list"
+    - dl_monitor is not failed

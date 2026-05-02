@@ -27,13 +27,13 @@ ip_geoserver_read_2: "{{ lookup('env', 'IP_GEOSERVER_READ_2') | default('192.168
 ip_haproxy_1:        "{{ lookup('env', 'IP_HAPROXY_1')        | default('192.168.56.40', true) }}"
 ip_haproxy_2:        "{{ lookup('env', 'IP_HAPROXY_2')        | default('192.168.56.41', true) }}"
 
-
 # -----------------------------------------------------------------------------
 # PROXY (opcional — deixe vazio para desabilitar)
 # -----------------------------------------------------------------------------
 http_proxy:  "{{ lookup('env', 'HTTP_PROXY')  | default('', true) }}"
 https_proxy: "{{ lookup('env', 'HTTPS_PROXY') | default(http_proxy, true) }}"
 no_proxy:    "{{ lookup('env', 'NO_PROXY')    | default('localhost,127.0.0.1,' ~ ip_db ~ ',' ~ ip_geonode ~ ',' ~ ip_geoserver_write ~ ',' ~ ip_geoserver_read_1 ~ ',' ~ ip_geoserver_read_2 ~ ',' ~ ip_haproxy_1 ~ ',' ~ ip_haproxy_2 ~ ',' ~ haproxy_vip, true) }}"
+
 # -----------------------------------------------------------------------------
 # BANCO DE DADOS
 # -----------------------------------------------------------------------------
@@ -74,29 +74,36 @@ nfs_server:       "{{ lookup('env', 'NFS_SERVER')      | default(ip_geoserver_wr
 nfs_export_path:  "{{ lookup('env', 'NFS_EXPORT_PATH') | default('/opt/geoserver_data', true) }}"
 
 # Clustering JMS
-geoserver_cluster_broker_url:              "{{ lookup('env', 'GEOSERVER_CLUSTER_BROKER_URL')              | default('tcp://' ~ ip_geoserver_write ~ ':61666', true) }}"
-geoserver_cluster_instance_name_write:     "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_WRITE')     | default('geoserver-master',   true) }}"
-geoserver_cluster_instance_name_read_1:    "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_READ_1')    | default('geoserver-worker-1', true) }}"
-geoserver_cluster_instance_name_read_2:    "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_READ_2')    | default('geoserver-worker-2', true) }}"
+geoserver_cluster_broker_url:           "{{ lookup('env', 'GEOSERVER_CLUSTER_BROKER_URL')           | default('tcp://' ~ ip_geoserver_write ~ ':61666', true) }}"
+geoserver_cluster_instance_name_write:  "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_WRITE')  | default('geoserver-master',   true) }}"
+geoserver_cluster_instance_name_read_1: "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_READ_1') | default('geoserver-worker-1', true) }}"
+geoserver_cluster_instance_name_read_2: "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_READ_2') | default('geoserver-worker-2', true) }}"
 
 # Plugins
+# GEOSERVER_PLUGINS: lista separada por vírgula dos plugins a instalar.
+# Plugins disponíveis: jms-cluster, geofence-server, control-flow, monitor
 geoserver_plugins: "{{ lookup('env', 'GEOSERVER_PLUGINS') | default('jms-cluster,geofence-server,monitor,control-flow', true) }}"
+
+# Backend do geofence-server.
+# postgres → recomendado para produção (requer PostgreSQL externo configurado)
+# h2       → apenas para testes/demo (banco embarcado, incompatível com outros plugins H2)
+geofence_backend: "{{ lookup('env', 'GEOFENCE_BACKEND') | default('postgres', true) }}"
 
 # -----------------------------------------------------------------------------
 # HAPROXY
 # -----------------------------------------------------------------------------
-haproxy_stats_port:     "{{ lookup('env', 'HAPROXY_STATS_PORT')     | default('8404',   true) }}"
-haproxy_stats_user:     "{{ lookup('env', 'HAPROXY_STATS_USER')     | default('admin',  true) }}"
-haproxy_stats_password: "{{ lookup('env', 'HAPROXY_STATS_PASSWORD') | default('changeme', true) }}"
-haproxy_http_port:      "{{ lookup('env', 'HAPROXY_HTTP_PORT')      | default('80',     true) }}"
-haproxy_https_port:     "{{ lookup('env', 'HAPROXY_HTTPS_PORT')     | default('443',    true) }}"
-haproxy_connect_timeout: "{{ lookup('env', 'HAPROXY_CONNECT_TIMEOUT')| default('10s',   true) }}"
-haproxy_client_timeout: "{{ lookup('env', 'HAPROXY_CLIENT_TIMEOUT') | default('60s',   true) }}"
-haproxy_server_timeout: "{{ lookup('env', 'HAPROXY_SERVER_TIMEOUT') | default('60s',   true) }}"
+haproxy_stats_port:      "{{ lookup('env', 'HAPROXY_STATS_PORT')      | default('8404',    true) }}"
+haproxy_stats_user:      "{{ lookup('env', 'HAPROXY_STATS_USER')      | default('admin',   true) }}"
+haproxy_stats_password:  "{{ lookup('env', 'HAPROXY_STATS_PASSWORD')  | default('changeme', true) }}"
+haproxy_http_port:       "{{ lookup('env', 'HAPROXY_HTTP_PORT')       | default('80',      true) }}"
+haproxy_https_port:      "{{ lookup('env', 'HAPROXY_HTTPS_PORT')      | default('443',     true) }}"
+haproxy_connect_timeout: "{{ lookup('env', 'HAPROXY_CONNECT_TIMEOUT') | default('10s',     true) }}"
+haproxy_client_timeout:  "{{ lookup('env', 'HAPROXY_CLIENT_TIMEOUT')  | default('60s',     true) }}"
+haproxy_server_timeout:  "{{ lookup('env', 'HAPROXY_SERVER_TIMEOUT')  | default('60s',     true) }}"
 
 # -----------------------------------------------------------------------------
 # KEEPALIVED
 # -----------------------------------------------------------------------------
-keepalived_vrrp_id:       "{{ lookup('env', 'KEEPALIVED_VRRP_ID')       | default('51',    true) }}"
+keepalived_vrrp_id:       "{{ lookup('env', 'KEEPALIVED_VRRP_ID')       | default('51',       true) }}"
 keepalived_vrrp_password: "{{ lookup('env', 'KEEPALIVED_VRRP_PASSWORD') | default('changeme', true) }}"
-keepalived_interface:     "{{ lookup('env', 'KEEPALIVED_INTERFACE')     | default('eth1',  true) }}"
+keepalived_interface:     "{{ lookup('env', 'KEEPALIVED_INTERFACE')     | default('eth1',      true) }}"
