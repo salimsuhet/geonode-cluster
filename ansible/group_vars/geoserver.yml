@@ -8,23 +8,12 @@ geoserver_port: "{{ lookup('env', 'GEOSERVER_PORT') | default('8080', true) }}"
 # Diretório de dados (ponto de montagem NFS nos workers)
 geoserver_data_dir: "{{ lookup('env', 'GEOSERVER_DATA_DIR') | default('/opt/geoserver_data', true) }}"
 
-# Opções JVM
-geoserver_java_opts: >-
-  {{ lookup('env', 'GEOSERVER_JAVA_OPTS') | default(
-    '-Xms2g -Xmx4g
-     -XX:+UseG1GC
-     -XX:MaxGCPauseMillis=200
-     -XX:+UseStringDeduplication
-     -Dfile.encoding=UTF-8
-     -Djavax.servlet.request.encoding=UTF-8
-     -Djavax.servlet.response.encoding=UTF-8
-     -DGEOSERVER_XFRAME_OPTIONS=ALLOW
-     -Djava.awt.headless=true',
-    true) }}
+# Opções JVM — uma única linha (arquivos .env não suportam multilinha)
+geoserver_java_opts: "{{ lookup('env', 'GEOSERVER_JAVA_OPTS') | default('-Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -Dfile.encoding=UTF-8 -Djavax.servlet.request.encoding=UTF-8 -Djavax.servlet.response.encoding=UTF-8 -DGEOSERVER_XFRAME_OPTIONS=ALLOW -Djava.awt.headless=true', true) }}"
 
 # GeoWebCache
-gwc_enabled:    "{{ lookup('env', 'GWC_ENABLED')    | default('true',  true) }}"
-gwc_cache_dir:  "{{ lookup('env', 'GWC_CACHE_DIR')  | default(geoserver_data_dir ~ '/gwc', true) }}"
+gwc_enabled:   "{{ lookup('env', 'GWC_ENABLED')   | default('true', true) }}"
+gwc_cache_dir: "{{ lookup('env', 'GWC_CACHE_DIR') | default(geoserver_data_dir ~ '/gwc', true) }}"
 
 # Plugins a instalar
 geoserver_plugins: "{{ lookup('env', 'GEOSERVER_PLUGINS') | default('jms-cluster,geofence-server,monitor,control-flow', true) }}"
