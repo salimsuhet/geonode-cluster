@@ -4,6 +4,28 @@
 # A variável `geoserver_role` (write|read) e `geoserver_is_master` (bool)
 # são definidas no inventário por host.
 
+# ------------------------------------------------------------------
+# Usuário e grupos
+# ------------------------------------------------------------------
+- name: Cria grupo geoserver
+  group:
+    name: geoserver
+    state: present
+  tags: [geoserver]
+
+- name: Cria usuário geoserver
+  user:
+    name: geoserver
+    group: geoserver
+    groups: docker
+    append: yes
+    shell: /usr/sbin/nologin
+    home: /opt/geoserver
+    create_home: no
+    system: yes
+    state: present
+  tags: [geoserver]
+
 - name: Cria estrutura de diretórios GeoServer
   file:
     path: "{{ item }}"
