@@ -1,6 +1,9 @@
 # postgresql.conf — gerenciado pelo Ansible
 # Baseado nas variáveis do envs/.env
 
+# Obrigatório no Ubuntu/Debian — pg_ctlcluster exige este parâmetro explícito
+data_directory = '/var/lib/postgresql/15/main'
+
 listen_addresses = '*'
 port = {{ postgres_port }}
 max_connections = {{ postgres_max_connections }}
