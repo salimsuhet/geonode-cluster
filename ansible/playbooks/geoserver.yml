@@ -1,36 +1,25 @@
 ---
-# playbooks/geoserver.yml
-# Deploy isolado do cluster GeoServer
-# Uso: ansible-playbook -i inventories/vagrant/hosts.yml playbooks/geoserver.yml
+# group_vars/geoserver.yml
+# Variáveis compartilhadas por TODOS os nós GeoServer (write + read)
 
-# 1. Servidor NFS (master exporta o data dir)
-- name: GeoServer — NFS Server (Write)
-  hosts: geoserver_write
-  tags: [nfs, nfs_server]
-  roles:
-    - common
-    - docker
-    - nfs_server
+# Porta de acesso ao GeoServer
+geoserver_port: "{{ lookup('env', 'GEOSERVER_PORT') | default('8080', true) }}"
 
-# 2. GeoServer Master
-- name: GeoServer — Deploy Master (Write)
-  hosts: geoserver_write
-  tags: [geoserver, geoserver_write]
-  roles:
-    - geoserver
+# Diretório de dados (ponto de montagem NFS nos workers)
+geoserver_data_dir: "{{ lookup('env', 'GEOSERVER_DATA_DIR') | default('/opt/geoserver_data', true) }}"
 
-# 3. Clientes NFS (workers montam antes de iniciar)
-- name: GeoServer — NFS Clients (Read)
-  hosts: geoserver_read
-  tags: [nfs, nfs_client]
-  roles:
-    - common
-    - docker
-    - nfs_client
+# Opções JVM — uma única linha (arquivos .env não suportam multilinha)
+geoserver_java_opts: "{{ lookup('env', 'GEOSERVER_JAVA_OPTS') | default('-Xms2g -Xmx4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -Dfile.encoding=UTF-8 -Djavax.servlet.request.encoding=UTF-8 -Djavax.servlet.response.encoding=UTF-8 -DGEOSERVER_XFRAME_OPTIONS=ALLOW -Djava.awt.headless=true', true) }}"
 
-# 4. Workers
-- name: GeoServer — Deploy Workers (Read)
-  hosts: geoserver_read
-  tags: [geoserver, geoserver_read]
-  roles:
-    - geoserver
+# GeoWebCache
+gwc_enabled:    "{{ lookup('env', 'GWC_ENABLED')   | default('true', true) }}"
+gwc_cache_dir:  "{{ lookup('env', 'GWC_CACHE_DIR') | default(geoserver_data_dir ~ '/gwc', true) }}"
+
+# Plugins a instalar
+geoserver_plugins: "{{ lookup('env', 'GEOSERVER_PLUGINS') | default('jms-cluster,geofence-server,monitor,control-flow', true) }}"
+
+# Cluster JMS
+geoserver_cluster_broker_url:           "{{ lookup('env', 'GEOSERVER_CLUSTER_BROKER_URL')           | default('tcp://' ~ ip_geoserver_write ~ ':61666', true) }}"
+geoserver_cluster_instance_name_write:  "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_WRITE')  | default('geoserver-master',   true) }}"
+geoserver_cluster_instance_name_read_1: "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_READ_1') | default('geoserver-worker-1', true) }}"
+geoserver_cluster_instance_name_read_2: "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_READ_2') | default('geoserver-worker-2', true) }}"
