@@ -48,9 +48,11 @@
     daemon_reload: yes
   tags: [geonode]
 
+# O Nginx da imagem geonode/nginx bloqueia requests com Host: localhost
+# retornando 444. Usa-se 127.0.0.1 que está no server_name do Nginx.
 - name: Aguarda GeoNode responder (até 5 minutos)
   uri:
-    url: "http://localhost/api/v2/resources/"
+    url: "http://127.0.0.1/api/v2/resources/"
     status_code: [200, 401, 403]
     timeout: 10
   register: gn_health
