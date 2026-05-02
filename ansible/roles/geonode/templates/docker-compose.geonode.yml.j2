@@ -75,9 +75,11 @@ services:
 
   # ------------------------------------------------------------
   # Nginx (proxy reverso interno)
+  # A imagem geonode/nginx usa tag própria de versão do nginx,
+  # independente da versão do GeoNode.
   # ------------------------------------------------------------
   nginx:
-    image: geonode/nginx:{{ geonode_version }}
+    image: geonode/nginx:{{ geonode_nginx_image_tag }}
     container_name: geonode_nginx
     restart: unless-stopped
     env_file: .env

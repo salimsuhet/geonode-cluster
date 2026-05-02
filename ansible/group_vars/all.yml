@@ -7,10 +7,14 @@
 # -----------------------------------------------------------------------------
 # VERSÕES
 # -----------------------------------------------------------------------------
-geonode_version:    "{{ lookup('env', 'GEONODE_VERSION')    | default('5.0.2',          true) }}"
+geonode_version:    "{{ lookup('env', 'GEONODE_VERSION')    | default('5.0.1',          true) }}"
 geoserver_version:  "{{ lookup('env', 'GEOSERVER_VERSION')  | default('2.27.4',         true) }}"
 geoserver_image:    "{{ lookup('env', 'GEOSERVER_IMAGE')    | default('geonode/geoserver:2.27.4-latest', true) }}"
 postgres_version:   "{{ lookup('env', 'POSTGRES_VERSION')   | default('15',             true) }}"
+
+# Tag da imagem geonode/nginx — usa versionamento próprio do nginx,
+# independente da versão do GeoNode (ex: 1.28.0-v1)
+geonode_nginx_image_tag: "{{ lookup('env', 'GEONODE_NGINX_IMAGE_TAG') | default('1.28.0-v1', true) }}"
 
 # -----------------------------------------------------------------------------
 # REDE
