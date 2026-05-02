@@ -41,6 +41,29 @@
   tags: [geoserver]
 
 # ------------------------------------------------------------------
+# Pré-população do data dir (apenas no master — workers herdam via NFS)
+#
+# O entrypoint da imagem geonode/geoserver usa `set -e` e executa `cp`
+# em arquivos de segurança sem verificar se existem, causando falha
+# imediata quando o data dir está vazio na primeira execução.
+#
+# Copiamos o data dir padrão da imagem para o host antes de subir o
+# container. O parâmetro `creates` garante idempotência: só executa
+# se global.xml ainda não existir.
+# ------------------------------------------------------------------
+- name: Pré-popula data dir com configuração padrão da imagem (primeira execução)
+  shell: |
+    docker run --rm \
+      -v {{ geoserver_data_dir }}:/target \
+      --entrypoint sh \
+      {{ geoserver_image }} \
+      -c "cp -rn /usr/local/tomcat/webapps/geoserver/data/. /target/"
+    chown -R geoserver:geoserver {{ geoserver_data_dir }}
+  args:
+    creates: "{{ geoserver_data_dir }}/global.xml"
+  tags: [geoserver]
+
+# ------------------------------------------------------------------
 # Plugins (baixa apenas no master; workers herdam via NFS)
 # ------------------------------------------------------------------
 - name: Cria diretório de plugins
