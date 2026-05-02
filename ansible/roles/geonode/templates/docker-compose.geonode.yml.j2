@@ -75,9 +75,14 @@ services:
 
   # ------------------------------------------------------------
   # Nginx (proxy reverso interno)
-  # As variáveis abaixo são específicas do nginx e NÃO devem
-  # estar no .env compartilhado — Django as interpretaria como
-  # sobrescrita de configurações de storage e quebraria.
+  #
+  # IMPORTANTE: estas variáveis são exclusivas do Nginx e NÃO
+  # devem estar no .env compartilhado — Django as interpretaria
+  # como sobrescrita de configurações internas e quebraria.
+  #
+  # O entrypoint da imagem concatena PUBLIC_HOST:GEONODE_LB_PORT
+  # para montar o header Host. Passamos GEONODE_LB_PORT vazio
+  # para evitar o sufixo ":" no valor final.
   # ------------------------------------------------------------
   nginx:
     image: geonode/nginx:{{ geonode_nginx_image_tag }}
@@ -87,9 +92,9 @@ services:
       RESOLVER: "127.0.0.11"
       STATIC_ROOT: "/mnt/volumes/statics"
       MEDIA_ROOT: "/mnt/volumes/statics"
-      GEONODE_LB_HOST_IP: "{{ ip_geonode }}"
-      GEONODE_LB_PORT: "{{ geonode_port | default('8000') }}"
-      GEOSERVER_LB_HOST_IP: "{{ ip_geoserver_write }}"
+      GEONODE_LB_HOST_IP: "django"
+      GEONODE_LB_PORT: ""
+      GEOSERVER_LB_HOST_IP: "geoserver"
       GEOSERVER_LB_PORT: "{{ geoserver_port }}"
       HTTP_HOST: "{{ haproxy_vip }}"
       HTTP_SCHEME: "http"
