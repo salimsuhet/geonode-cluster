@@ -9,6 +9,7 @@ services:
   # ------------------------------------------------------------
   django:
     image: {% if govbr_client_id is defined and govbr_client_id %}geonode-govbr:{{ geonode_version }}{% else %}geonode/geonode:{{ geonode_version }}{% endif %}
+
     container_name: geonode_django
     restart: unless-stopped
     env_file: .env
@@ -39,6 +40,7 @@ services:
   # ------------------------------------------------------------
   celery:
     image: {% if govbr_client_id is defined and govbr_client_id %}geonode-govbr:{{ geonode_version }}{% else %}geonode/geonode:{{ geonode_version }}{% endif %}
+
     container_name: geonode_celery
     restart: unless-stopped
     env_file: .env
@@ -60,6 +62,7 @@ services:
   # ------------------------------------------------------------
   celerybeat:
     image: {% if govbr_client_id is defined and govbr_client_id %}geonode-govbr:{{ geonode_version }}{% else %}geonode/geonode:{{ geonode_version }}{% endif %}
+
     container_name: geonode_celerybeat
     restart: unless-stopped
     env_file: .env
@@ -80,9 +83,12 @@ services:
   # devem estar no .env compartilhado — Django as interpretaria
   # como sobrescrita de configurações internas e quebraria.
   #
-  # O entrypoint da imagem concatena PUBLIC_HOST:GEONODE_LB_PORT
-  # para montar o header Host. Passamos GEONODE_LB_PORT vazio
-  # para evitar o sufixo ":" no valor final.
+  # HTTP_HOST define o server_name do Nginx — deve ser o hostname
+  # público pelo qual os usuários acessam (floating IP ou FQDN).
+  # 127.0.0.1 é sempre adicionado automaticamente pelo entrypoint.
+  #
+  # GEONODE_LB_PORT deve ficar vazio para evitar o sufixo ":"
+  # no header Host gerado pelo entrypoint da imagem.
   # ------------------------------------------------------------
   nginx:
     image: geonode/nginx:{{ geonode_nginx_image_tag }}
@@ -96,9 +102,9 @@ services:
       GEONODE_LB_PORT: ""
       GEOSERVER_LB_HOST_IP: "geoserver"
       GEOSERVER_LB_PORT: "{{ geoserver_port }}"
-      HTTP_HOST: "{{ haproxy_vip }}"
+      HTTP_HOST: "{{ geonode_public_hostname }}"
       HTTP_SCHEME: "http"
-      PUBLIC_HOST: "{{ haproxy_vip }}"
+      PUBLIC_HOST: "{{ geonode_public_hostname }}"
     ports:
       - "80:80"
     volumes:
