@@ -83,20 +83,15 @@ frontend http_frontend
     acl is_wcs_write        path_sub -i service=WCS request=Update
 
     # Roteamento
-    # Admin e operações de escrita → sempre para o master
     use_backend geoserver_write if is_geoserver is_geoserver_admin
     use_backend geoserver_write if is_geoserver is_write_method
     use_backend geoserver_write if is_geoserver is_wfs_transaction
     use_backend geoserver_write if is_geoserver is_wcs_write
-    # Leitura GeoServer → workers (round-robin)
     use_backend geoserver_read  if is_geoserver
-    # Demais → GeoNode
     default_backend geonode_app
 
 #---------------------------------------------------------------------
 # Backend — GeoServer WRITE (Master)
-# Recebe: admin, POST/PUT/DELETE, WFS-T
-# Health check: GeoServer responde em qualquer Host header
 #---------------------------------------------------------------------
 backend geoserver_write
     balance     roundrobin
@@ -104,7 +99,6 @@ backend geoserver_write
     http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host {{ ip_geoserver_write }}
     http-check  expect rstatus 200|302
 
-    # Sticky session baseado em cookie JSESSIONID
     cookie SERVERID insert indirect nocache
 
     http-request set-header X-Forwarded-Host %[req.hdr(Host)]
@@ -115,7 +109,6 @@ backend geoserver_write
 
 #---------------------------------------------------------------------
 # Backend — GeoServer READ (Workers)
-# Recebe: GET WMS/WFS/WCS/WMTS
 #---------------------------------------------------------------------
 backend geoserver_read
     balance     leastconn
@@ -127,25 +120,23 @@ backend geoserver_read
     http-request set-header X-Real-IP       %[src]
     http-request set-header X-Forwarded-For %[src]
 
-    # Fallback para o master se ambos workers estiverem down
     server geoserver-read-1 {{ ip_geoserver_read_1 }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 weight 10
     server geoserver-read-2 {{ ip_geoserver_read_2 }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 weight 10
     server geoserver-write-fallback {{ ip_geoserver_write }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 backup
 
 #---------------------------------------------------------------------
 # Backend — GeoNode (Django/Nginx)
-# Health check: usa o VIP como Host pois o Nginx do GeoNode
-# só aceita Host: {{ haproxy_vip }} ou Host: 127.0.0.1
+# Health check usa Host: 127.0.0.1 — sempre presente no server_name
+# do Nginx independente do HTTP_HOST configurado.
 #---------------------------------------------------------------------
 backend geonode_app
     balance     leastconn
     option      httpchk
-    http-check  send meth GET uri /api/v2/ ver HTTP/1.1 hdr Host {{ haproxy_vip }}
+    http-check  send meth GET uri /api/v2/ ver HTTP/1.1 hdr Host 127.0.0.1
     http-check  expect status 200
 
     http-request set-header X-Forwarded-Host %[req.hdr(Host)]
     http-request set-header X-Real-IP       %[src]
     http-request set-header X-Forwarded-For %[src]
 
-    # GeoNode roda na porta 80 (Nginx interno do container)
     server geonode {{ ip_geonode }}:80 check inter 15s fall 3 rise 2
