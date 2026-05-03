@@ -17,9 +17,7 @@
 
   <!--
     accessTokenUri — chamada server-side (GeoServer → GeoNode).
-    Usa o IP interno do GeoNode para evitar hairpin NAT no OpenStack:
-    instâncias não conseguem alcançar o próprio Floating IP a partir
-    da rede privada.
+    Usa o IP interno do GeoNode para evitar hairpin NAT no OpenStack.
   -->
   <accessTokenUri>http://{{ ip_geonode }}/o/token/</accessTokenUri>
 
@@ -34,9 +32,12 @@
 
   <!--
     checkTokenEndpointUrl — chamada server-side (GeoServer → GeoNode).
-    Usa o IP interno pelo mesmo motivo do accessTokenUri.
+    Usa /o/introspect/ (RFC 7662, django-oauth-toolkit) em vez de
+    /api/o/v4/tokeninfo/ (endpoint customizado do GeoNode que só aceita
+    POST com token no body — incompatível com o plugin do GeoServer).
+    Usa o IP interno para evitar hairpin NAT.
   -->
-  <checkTokenEndpointUrl>http://{{ ip_geonode }}/api/o/v4/tokeninfo/</checkTokenEndpointUrl>
+  <checkTokenEndpointUrl>http://{{ ip_geonode }}/o/introspect/</checkTokenEndpointUrl>
 
   <!-- GeoNode logoutUri — redirect do browser -->
   <logoutUri>http://{{ geonode_public_hostname }}/account/logout/</logoutUri>
