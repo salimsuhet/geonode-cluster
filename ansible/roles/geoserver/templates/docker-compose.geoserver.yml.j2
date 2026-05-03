@@ -15,6 +15,11 @@ services:
       - {{ geoserver_data_dir }}:/opt/geoserver/data_dir
       - {{ geoserver_data_dir }}/plugins:/opt/geoserver/webapps/geoserver/WEB-INF/lib/extra
       - {{ geoserver_data_dir }}/logs:/opt/geoserver/logs
+      # set_geoserver_auth.sh corrigido: remove a linha `echo " " >> file`
+      # do script original da imagem, que adicionava trailing whitespace nos
+      # arquivos XML de segurança e causava java.io.EOFException no XStream
+      # durante a autenticação OAuth2.
+      - /opt/geoserver/set_geoserver_auth.sh:/usr/local/tomcat/tmp/set_geoserver_auth.sh:ro
     environment:
       # Estes sobrescrevem o .env intencionalmente para garantir os valores corretos
       GEOSERVER_DATA_DIR: /opt/geoserver/data_dir
