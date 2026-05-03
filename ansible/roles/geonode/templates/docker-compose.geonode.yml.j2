@@ -90,6 +90,11 @@ services:
   # barra para servir arquivos corretamente.
   #
   # GEONODE_LB_PORT="" evita o sufixo ":" no header Host.
+  #
+  # HTTP_HOST com múltiplos valores: o entrypoint da imagem geonode/nginx
+  # usa HTTP_HOST como server_name do Nginx. Incluímos o IP interno do
+  # GeoNode ({{ ip_geonode }}) para que o GeoServer consiga alcançar o
+  # GeoNode diretamente pela rede privada (evita hairpin NAT do OpenStack).
   # ------------------------------------------------------------
   nginx:
     image: geonode/nginx:{{ geonode_nginx_image_tag }}
@@ -103,7 +108,7 @@ services:
       GEONODE_LB_PORT: ""
       GEOSERVER_LB_HOST_IP: "geoserver"
       GEOSERVER_LB_PORT: "{{ geoserver_port }}"
-      HTTP_HOST: "{{ geonode_public_hostname }}"
+      HTTP_HOST: "{{ geonode_public_hostname }} {{ ip_geonode }}"
       HTTP_PORT: "80"
       HTTP_SCHEME: "http"
       PUBLIC_HOST: "{{ geonode_public_hostname }}"
