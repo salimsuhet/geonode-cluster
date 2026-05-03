@@ -15,19 +15,30 @@
   <cliendId>{{ oauth2_client_id }}</cliendId>
   <clientSecret>{{ oauth2_client_secret }}</clientSecret>
 
-  <!-- GeoNode accessTokenUri — montado em ^o/ no GeoNode 5.x (sem prefixo /api/) -->
-  <accessTokenUri>http://{{ geonode_public_hostname }}/o/token/</accessTokenUri>
+  <!--
+    accessTokenUri — chamada server-side (GeoServer → GeoNode).
+    Usa o IP interno do GeoNode para evitar hairpin NAT no OpenStack:
+    instâncias não conseguem alcançar o próprio Floating IP a partir
+    da rede privada.
+  -->
+  <accessTokenUri>http://{{ ip_geonode }}/o/token/</accessTokenUri>
 
-  <!-- GeoNode userAuthorizationUri — montado em ^o/ no GeoNode 5.x (sem prefixo /api/) -->
+  <!--
+    userAuthorizationUri — redirect do browser do usuário.
+    Usa o hostname público pois é o browser que acessa, não o GeoServer.
+  -->
   <userAuthorizationUri>http://{{ geonode_public_hostname }}/o/authorize/</userAuthorizationUri>
 
-  <!-- GeoServer Public URL -->
+  <!-- GeoServer Public URL — redirect do browser após autorização -->
   <redirectUri>http://{{ geonode_public_hostname }}/geoserver/index.html</redirectUri>
 
-  <!-- GeoNode checkTokenEndpointUrl — este SIM fica em /api/o/v4/ no GeoNode 5.x -->
-  <checkTokenEndpointUrl>http://{{ geonode_public_hostname }}/api/o/v4/tokeninfo/</checkTokenEndpointUrl>
+  <!--
+    checkTokenEndpointUrl — chamada server-side (GeoServer → GeoNode).
+    Usa o IP interno pelo mesmo motivo do accessTokenUri.
+  -->
+  <checkTokenEndpointUrl>http://{{ ip_geonode }}/api/o/v4/tokeninfo/</checkTokenEndpointUrl>
 
-  <!-- GeoNode logoutUri -->
+  <!-- GeoNode logoutUri — redirect do browser -->
   <logoutUri>http://{{ geonode_public_hostname }}/account/logout/</logoutUri>
 
   <scopes>write</scopes>
