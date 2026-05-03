@@ -110,12 +110,13 @@
 # Corrige o proxyBaseUrl no global.xml para usar o hostname público.
 # Sem isso, o Spring Security monta o form action com o IP interno
 # do VIP e a CSP (form-action 'self') bloqueia o login OAuth2.
+# Usa replace (regex) para evitar dependência de lxml no host remoto.
 # ------------------------------------------------------------------
 - name: Corrige proxyBaseUrl no global.xml do GeoServer
-  xml:
+  replace:
     path: "{{ geoserver_data_dir }}/global.xml"
-    xpath: /global/settings/proxyBaseUrl
-    value: "http://{{ geonode_public_hostname }}/geoserver"
+    regexp: '<proxyBaseUrl>.*</proxyBaseUrl>'
+    replace: '<proxyBaseUrl>http://{{ geonode_public_hostname }}/geoserver</proxyBaseUrl>'
   when: geoserver_is_master | bool
   notify: Restart GeoServer
   tags: [geoserver, oauth2]
