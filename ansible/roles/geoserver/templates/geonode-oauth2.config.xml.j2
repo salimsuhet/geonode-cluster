@@ -15,16 +15,16 @@
   <cliendId>{{ oauth2_client_id }}</cliendId>
   <clientSecret>{{ oauth2_client_secret }}</clientSecret>
 
-  <!-- GeoNode accessTokenUri -->
-  <accessTokenUri>http://{{ geonode_public_hostname }}/api/o/token/</accessTokenUri>
+  <!-- GeoNode accessTokenUri — montado em ^o/ no GeoNode 5.x (sem prefixo /api/) -->
+  <accessTokenUri>http://{{ geonode_public_hostname }}/o/token/</accessTokenUri>
 
-  <!-- GeoNode userAuthorizationUri -->
-  <userAuthorizationUri>http://{{ geonode_public_hostname }}/api/o/authorize/</userAuthorizationUri>
+  <!-- GeoNode userAuthorizationUri — montado em ^o/ no GeoNode 5.x (sem prefixo /api/) -->
+  <userAuthorizationUri>http://{{ geonode_public_hostname }}/o/authorize/</userAuthorizationUri>
 
   <!-- GeoServer Public URL -->
   <redirectUri>http://{{ geonode_public_hostname }}/geoserver/index.html</redirectUri>
 
-  <!-- GeoNode checkTokenEndpointUrl -->
+  <!-- GeoNode checkTokenEndpointUrl — este SIM fica em /api/o/v4/ no GeoNode 5.x -->
   <checkTokenEndpointUrl>http://{{ geonode_public_hostname }}/api/o/v4/tokeninfo/</checkTokenEndpointUrl>
 
   <!-- GeoNode logoutUri -->
