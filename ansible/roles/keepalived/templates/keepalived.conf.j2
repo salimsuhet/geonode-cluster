@@ -1,4 +1,4 @@
-# keepalived.conf — {{ inventory_hostname }} ({{ keepalived_role }})
+# keepalived.conf — {{ inventory_hostname }} ({{ keepalived_state }})
 # Gerenciado pelo Ansible
 
 global_defs {
@@ -19,7 +19,7 @@ vrrp_script chk_haproxy {
 
 # Instância VRRP principal
 vrrp_instance VI_GEONODE {
-    state            {{ keepalived_role }}
+    state            {{ keepalived_state }}
     interface        {{ keepalived_interface }}
     virtual_router_id {{ keepalived_vrrp_id }}
     priority         {{ keepalived_priority }}
