@@ -37,6 +37,7 @@
     - "{{ geoserver_data_dir }}"
     - "{{ geoserver_data_dir }}/logs"
     - "{{ geoserver_data_dir }}/gwc"
+    - "{{ geoserver_data_dir }}/security/filter/geonode-oauth2"
     - /opt/geoserver/config
   tags: [geoserver]
 
@@ -79,6 +80,25 @@
   include_tasks: plugins.yml
   when: geoserver_is_master | bool
   tags: [geoserver, plugins]
+
+# ------------------------------------------------------------------
+# Configuração OAuth2 — cria o config.xml do filtro geonode-oauth2
+# O diretório security/filter/geonode-oauth2 é criado na etapa de
+# estrutura de diretórios acima, garantindo que o template não falhe.
+# Só aplica se oauth2_client_id estiver definido.
+# ------------------------------------------------------------------
+- name: Cria config.xml do filtro OAuth2 do GeoServer
+  template:
+    src: geonode-oauth2.config.xml.j2
+    dest: "{{ geoserver_data_dir }}/security/filter/geonode-oauth2/config.xml"
+    owner: geoserver
+    group: geoserver
+    mode: '0644'
+  when:
+    - geoserver_is_master | bool
+    - oauth2_client_id | length > 0
+  notify: Restart GeoServer
+  tags: [geoserver, oauth2]
 
 # ------------------------------------------------------------------
 # Configuração de clustering JMS
