@@ -135,7 +135,7 @@
   changed_when: false
   tags: [geonode, static]
 
-# invoke prepare configura OAuth2, fixtures e integração GeoServer.
+# invoke prepare configura OAuth2 e fixtures de integração com GeoServer.
 # Requer OAUTH2_CLIENT_ID e OAUTH2_CLIENT_SECRET no .env.
 # Se as variáveis estiverem vazias, pula silenciosamente.
 - name: Executa invoke prepare (configura OAuth2 e GeoServer)
@@ -145,6 +145,23 @@
     env:
       OAUTH2_CLIENT_ID: "{{ oauth2_client_id }}"
       OAUTH2_CLIENT_SECRET: "{{ oauth2_client_secret }}"
+  changed_when: false
+  when: oauth2_client_id | length > 0
+  tags: [geonode, oauth2]
+
+# O invoke prepare gera redirect_uris como {SITEURL}geoserver/index.html
+# mas o GeoServer usa /geoserver/web/ para o redirect OAuth2.
+# Corrigimos aqui para usar a URL correta do web UI.
+- name: Corrige redirect URIs da aplicação OAuth2
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: >-
+      python manage.py shell -c
+      "from oauth2_provider.models import Application;
+      app = Application.objects.filter(name='GeoServer').first();
+      app and setattr(app, 'redirect_uris', 'http://{{ geonode_public_hostname }}/geoserver/web/\nhttp://{{ geonode_public_hostname }}/geoserver/index.html') or None;
+      app and app.save();
+      print('redirect_uris:', app.redirect_uris if app else 'app not found')"
   changed_when: false
   when: oauth2_client_id | length > 0
   tags: [geonode, oauth2]
