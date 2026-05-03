@@ -43,14 +43,6 @@
 
 # ------------------------------------------------------------------
 # Pré-população do data dir (apenas no master — workers herdam via NFS)
-#
-# O entrypoint da imagem geonode/geoserver usa `set -e` e executa `cp`
-# em arquivos de segurança sem verificar se existem, causando falha
-# imediata quando o data dir está vazio na primeira execução.
-#
-# Copiamos o data dir padrão da imagem para o host antes de subir o
-# container. O parâmetro `creates` garante idempotência: só executa
-# se global.xml ainda não existir.
 # ------------------------------------------------------------------
 - name: Pré-popula data dir com configuração padrão da imagem (primeira execução)
   shell: |
@@ -63,6 +55,28 @@
   args:
     creates: "{{ geoserver_data_dir }}/global.xml"
   tags: [geoserver]
+
+# ------------------------------------------------------------------
+# Script corrigido do entrypoint da imagem geonode/geoserver.
+#
+# O set_geoserver_auth.sh original adiciona `echo " " >> file` antes
+# de processar cada arquivo XML de segurança (config.xml do OAuth2,
+# role service, auth provider e global.xml). Esse trailing whitespace
+# causa java.io.EOFException no XStream ao carregar as configurações
+# durante a autenticação OAuth2.
+#
+# Montamos uma versão corrigida (sem o echo) via volume no docker-compose,
+# sobrescrevendo o script da imagem antes do container iniciar.
+# ------------------------------------------------------------------
+- name: Copia set_geoserver_auth.sh corrigido para o host
+  copy:
+    src: set_geoserver_auth.sh
+    dest: /opt/geoserver/set_geoserver_auth.sh
+    owner: root
+    group: root
+    mode: '0755'
+  notify: Restart GeoServer
+  tags: [geoserver, oauth2]
 
 # ------------------------------------------------------------------
 # Plugins (baixa apenas no master; workers herdam via NFS)
@@ -89,9 +103,7 @@
 # O XStream deserializa pelo nome do campo, não pelo nome semântico.
 # Corrigir para <clientId> faz o plugin retornar client_id=null.
 #
-# O diretório security/filter/geonode-oauth2 é criado na etapa de
-# estrutura de diretórios acima. Só aplica no master e se
-# oauth2_client_id estiver definido.
+# Só aplica no master e se oauth2_client_id estiver definido.
 # ------------------------------------------------------------------
 - name: Cria config.xml do filtro OAuth2 do GeoServer
   template:
