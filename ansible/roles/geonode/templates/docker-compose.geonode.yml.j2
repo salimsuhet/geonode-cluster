@@ -82,19 +82,10 @@ services:
   # Variáveis exclusivas do Nginx — NÃO devem estar no .env
   # compartilhado (Django as interpreta como configs internas).
   #
-  # HTTP_PORT="80" é obrigatório: o entrypoint usa
-  # PUBLIC_HOST="$HTTP_HOST:$HTTP_PORT" quando HTTP_PORT != 80,
-  # gerando "ip:" com dois pontos sem a porta.
-  #
-  # STATIC_ROOT com barra final: o alias do Nginx precisa da
-  # barra para servir arquivos corretamente.
-  #
-  # GEONODE_LB_PORT="" evita o sufixo ":" no header Host.
-  #
-  # HTTP_HOST com múltiplos valores: o entrypoint da imagem geonode/nginx
-  # usa HTTP_HOST como server_name do Nginx. Incluímos o IP interno do
-  # GeoNode ({{ ip_geonode }}) para que o GeoServer consiga alcançar o
-  # GeoNode diretamente pela rede privada (evita hairpin NAT do OpenStack).
+  # nginx-internal.conf: server block extra que aceita requests
+  # vindos do IP interno do GeoNode ({{ ip_geonode }}), necessário
+  # para que o GeoServer consiga chamar /o/token/ e /api/o/v4/tokeninfo/
+  # diretamente pela rede privada (evita hairpin NAT do OpenStack).
   # ------------------------------------------------------------
   nginx:
     image: geonode/nginx:{{ geonode_nginx_image_tag }}
@@ -108,7 +99,7 @@ services:
       GEONODE_LB_PORT: ""
       GEOSERVER_LB_HOST_IP: "geoserver"
       GEOSERVER_LB_PORT: "{{ geoserver_port }}"
-      HTTP_HOST: "{{ geonode_public_hostname }} {{ ip_geonode }}"
+      HTTP_HOST: "{{ geonode_public_hostname }}"
       HTTP_PORT: "80"
       HTTP_SCHEME: "http"
       PUBLIC_HOST: "{{ geonode_public_hostname }}"
@@ -116,6 +107,7 @@ services:
       - "80:80"
     volumes:
       - statics:/mnt/volumes/statics
+      - /opt/geonode/nginx-internal.conf:/etc/nginx/sites-enabled/internal.conf:ro
     depends_on:
       - django
     networks:

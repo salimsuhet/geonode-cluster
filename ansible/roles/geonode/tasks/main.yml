@@ -63,6 +63,21 @@
   notify: Restart GeoNode
   tags: [geonode, config]
 
+# ------------------------------------------------------------------
+# nginx-internal.conf — server block extra para o IP interno do GeoNode.
+# Permite que o GeoServer chame /o/token/ e /api/o/v4/tokeninfo/
+# diretamente pela rede privada, evitando hairpin NAT do OpenStack.
+# O bloco principal do Nginx só aceita o hostname público; qualquer
+# outro Host cai no default_server que retorna 444.
+# ------------------------------------------------------------------
+- name: Gera nginx-internal.conf para aceitar IP interno
+  template:
+    src: nginx-internal.conf.j2
+    dest: /opt/geonode/nginx-internal.conf
+    mode: '0644'
+  notify: Restart GeoNode
+  tags: [geonode, config, oauth2]
+
 - name: Cria serviço systemd GeoNode
   template:
     src: geonode.service.j2
