@@ -96,11 +96,12 @@ frontend http_frontend
 #---------------------------------------------------------------------
 # Backend — GeoServer WRITE (Master)
 # Recebe: admin, POST/PUT/DELETE, WFS-T
+# Health check: GeoServer responde em qualquer Host header
 #---------------------------------------------------------------------
 backend geoserver_write
     balance     roundrobin
     option      httpchk
-    http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host localhost
+    http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host {{ ip_geoserver_write }}
     http-check  expect status 200
 
     # Sticky session baseado em cookie JSESSIONID
@@ -119,7 +120,7 @@ backend geoserver_write
 backend geoserver_read
     balance     leastconn
     option      httpchk
-    http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host localhost
+    http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host {{ ip_geoserver_write }}
     http-check  expect status 200
 
     http-request set-header X-Forwarded-Host %[req.hdr(Host)]
@@ -133,11 +134,13 @@ backend geoserver_read
 
 #---------------------------------------------------------------------
 # Backend — GeoNode (Django/Nginx)
+# Health check: usa o VIP como Host pois o Nginx do GeoNode
+# só aceita Host: {{ haproxy_vip }} ou Host: 127.0.0.1
 #---------------------------------------------------------------------
 backend geonode_app
     balance     leastconn
     option      httpchk
-    http-check  send meth GET uri /api/v2/ ver HTTP/1.1 hdr Host localhost
+    http-check  send meth GET uri /api/v2/ ver HTTP/1.1 hdr Host {{ haproxy_vip }}
     http-check  expect status 200
 
     http-request set-header X-Forwarded-Host %[req.hdr(Host)]
