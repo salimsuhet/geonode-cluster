@@ -61,7 +61,7 @@
   command: "ip addr show {{ keepalived_interface }}"
   register: vip_check
   changed_when: false
-  when: keepalived_role == 'MASTER'
+  when: keepalived_state == 'MASTER'
   tags: [keepalived]
 
 - name: Exibe status do VIP
@@ -69,5 +69,5 @@
     msg: >-
       VIP {{ haproxy_vip }}
       {{ 'ATIVO neste nó' if haproxy_vip in vip_check.stdout else 'não atribuído (normal em BACKUP)' }}
-  when: keepalived_role == 'MASTER'
+  when: keepalived_state == 'MASTER'
   tags: [keepalived]
