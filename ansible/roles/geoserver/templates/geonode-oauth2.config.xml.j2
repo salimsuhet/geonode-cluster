@@ -5,7 +5,14 @@
   <roleSource class="org.geoserver.security.config.PreAuthenticatedUserNameFilterConfig$PreAuthenticatedUserNameRoleSource">RoleService</roleSource>
   <userGroupServiceName>default</userGroupServiceName>
   <roleServiceName>geonode REST role service</roleServiceName>
-  <clientId>{{ oauth2_client_id }}</clientId>
+
+  <!--
+    ATENÇÃO: <cliendId> (sem 't') é intencional.
+    O XStream deserializa pelo nome exato do campo Java na classe
+    GeoNodeOAuthAuthenticationFilterConfig. Corrigir para <clientId>
+    faz o plugin carregar client_id=null silenciosamente.
+  -->
+  <cliendId>{{ oauth2_client_id }}</cliendId>
   <clientSecret>{{ oauth2_client_secret }}</clientSecret>
 
   <!-- GeoNode accessTokenUri -->

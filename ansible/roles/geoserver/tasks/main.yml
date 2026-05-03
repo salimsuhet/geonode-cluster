@@ -83,9 +83,15 @@
 
 # ------------------------------------------------------------------
 # Configuração OAuth2 — cria o config.xml do filtro geonode-oauth2
+#
+# ATENÇÃO: o campo <cliendId> (sem 't') é intencional — é o nome
+# do campo Java na classe GeoNodeOAuthAuthenticationFilterConfig.
+# O XStream deserializa pelo nome do campo, não pelo nome semântico.
+# Corrigir para <clientId> faz o plugin retornar client_id=null.
+#
 # O diretório security/filter/geonode-oauth2 é criado na etapa de
-# estrutura de diretórios acima, garantindo que o template não falhe.
-# Só aplica se oauth2_client_id estiver definido.
+# estrutura de diretórios acima. Só aplica no master e se
+# oauth2_client_id estiver definido.
 # ------------------------------------------------------------------
 - name: Cria config.xml do filtro OAuth2 do GeoServer
   template:
@@ -97,6 +103,20 @@
   when:
     - geoserver_is_master | bool
     - oauth2_client_id | length > 0
+  notify: Restart GeoServer
+  tags: [geoserver, oauth2]
+
+# ------------------------------------------------------------------
+# Corrige o proxyBaseUrl no global.xml para usar o hostname público.
+# Sem isso, o Spring Security monta o form action com o IP interno
+# do VIP e a CSP (form-action 'self') bloqueia o login OAuth2.
+# ------------------------------------------------------------------
+- name: Corrige proxyBaseUrl no global.xml do GeoServer
+  xml:
+    path: "{{ geoserver_data_dir }}/global.xml"
+    xpath: /global/settings/proxyBaseUrl
+    value: "http://{{ geonode_public_hostname }}/geoserver"
+  when: geoserver_is_master | bool
   notify: Restart GeoServer
   tags: [geoserver, oauth2]
 
