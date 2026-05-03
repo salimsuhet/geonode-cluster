@@ -79,16 +79,17 @@ services:
   # ------------------------------------------------------------
   # Nginx (proxy reverso interno)
   #
-  # IMPORTANTE: estas variáveis são exclusivas do Nginx e NÃO
-  # devem estar no .env compartilhado — Django as interpretaria
-  # como sobrescrita de configurações internas e quebraria.
+  # Variáveis exclusivas do Nginx — NÃO devem estar no .env
+  # compartilhado (Django as interpreta como configs internas).
   #
-  # HTTP_HOST define o server_name do Nginx — deve ser o hostname
-  # público pelo qual os usuários acessam (floating IP ou FQDN).
-  # 127.0.0.1 é sempre adicionado automaticamente pelo entrypoint.
+  # HTTP_PORT="80" é obrigatório: o entrypoint usa
+  # PUBLIC_HOST="$HTTP_HOST:$HTTP_PORT" quando HTTP_PORT != 80,
+  # gerando "ip:" com dois pontos sem a porta.
   #
-  # GEONODE_LB_PORT deve ficar vazio para evitar o sufixo ":"
-  # no header Host gerado pelo entrypoint da imagem.
+  # STATIC_ROOT com barra final: o alias do Nginx precisa da
+  # barra para servir arquivos corretamente.
+  #
+  # GEONODE_LB_PORT="" evita o sufixo ":" no header Host.
   # ------------------------------------------------------------
   nginx:
     image: geonode/nginx:{{ geonode_nginx_image_tag }}
@@ -96,8 +97,8 @@ services:
     restart: unless-stopped
     environment:
       RESOLVER: "127.0.0.11"
-      STATIC_ROOT: "/mnt/volumes/statics"
-      MEDIA_ROOT: "/mnt/volumes/statics"
+      STATIC_ROOT: "/mnt/volumes/statics/"
+      MEDIA_ROOT: "/mnt/volumes/statics/media/"
       GEONODE_LB_HOST_IP: "django"
       GEONODE_LB_PORT: ""
       GEOSERVER_LB_HOST_IP: "geoserver"
@@ -154,7 +155,7 @@ services:
     networks:
       - geonode
 
-  # Alias de rede para o banco externo (montado externamente)
+  # Alias de rede para o banco externo
   db:
     image: alpine
     container_name: geonode_db_dummy

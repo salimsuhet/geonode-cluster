@@ -65,10 +65,14 @@ django_language_code:    "{{ lookup('env', 'LANGUAGE_CODE')           | default(
 celery_broker_url:       "{{ lookup('env', 'CELERY_BROKER_URL')       | default('amqp://guest:guest@localhost:5672/', true) }}"
 
 # Hostname público do GeoNode — floating IP ou FQDN.
-# Define o server_name do Nginx e deve ser o endereço pelo qual
-# os usuários acessam externamente.
+# Define o server_name do Nginx, SITEURL e SITE_HOST_NAME do Django.
 # Sem floating IP, usa o VIP interno como fallback.
 geonode_public_hostname: "{{ lookup('env', 'GEONODE_PUBLIC_HOSTNAME') | default(haproxy_vip, true) }}"
+
+# OAuth2 — gerado na primeira execução e armazenado no .env
+# Necessário para autenticação do MapStore e integração GeoServer
+oauth2_client_id:     "{{ lookup('env', 'OAUTH2_CLIENT_ID')     | default('', true) }}"
+oauth2_client_secret: "{{ lookup('env', 'OAUTH2_CLIENT_SECRET') | default('', true) }}"
 
 # -----------------------------------------------------------------------------
 # GEOSERVER
@@ -93,8 +97,6 @@ geoserver_cluster_instance_name_read_2: "{{ lookup('env', 'GEOSERVER_CLUSTER_INS
 geoserver_plugins: "{{ lookup('env', 'GEOSERVER_PLUGINS') | default('jms-cluster,geofence-server,monitor,control-flow', true) }}"
 
 # Backend do geofence-server.
-# postgres → recomendado para produção
-# h2       → apenas para testes/demo
 geofence_backend: "{{ lookup('env', 'GEOFENCE_BACKEND') | default('postgres', true) }}"
 
 # -----------------------------------------------------------------------------

@@ -49,15 +49,15 @@
   tags: [geonode]
 
 # O Nginx da imagem geonode/nginx bloqueia requests com Host: localhost
-# retornando 444. Usa-se 127.0.0.1 que está no server_name do Nginx.
-- name: Aguarda GeoNode responder (até 5 minutos)
+# retornando 444. Usa-se 127.0.0.1 que está sempre no server_name.
+- name: Aguarda GeoNode responder (até 10 minutos)
   uri:
     url: "http://127.0.0.1/api/v2/resources/"
     status_code: [200, 401, 403]
     timeout: 10
   register: gn_health
   until: gn_health.status in [200, 401, 403]
-  retries: 30
+  retries: 60
   delay: 10
   tags: [geonode]
 
@@ -84,3 +84,17 @@
     command: python manage.py collectstatic --noinput
   changed_when: false
   tags: [geonode, static]
+
+# invoke prepare configura OAuth2, fixtures e integração GeoServer.
+# Requer OAUTH2_CLIENT_ID e OAUTH2_CLIENT_SECRET no .env.
+# Se as variáveis estiverem vazias, pula silenciosamente.
+- name: Executa invoke prepare (configura OAuth2 e GeoServer)
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: invoke prepare
+    env:
+      OAUTH2_CLIENT_ID: "{{ oauth2_client_id }}"
+      OAUTH2_CLIENT_SECRET: "{{ oauth2_client_secret }}"
+  changed_when: false
+  when: oauth2_client_id | length > 0
+  tags: [geonode, oauth2]
