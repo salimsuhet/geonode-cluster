@@ -61,8 +61,14 @@ geonode_admin_email:     "{{ lookup('env', 'GEONODE_ADMIN_EMAIL')     | default(
 django_debug:            "{{ lookup('env', 'DEBUG')                   | default('False',             true) }}"
 django_allowed_hosts:    "{{ lookup('env', 'DJANGO_ALLOWED_HOSTS')    | default('*',                 true) }}"
 django_time_zone:        "{{ lookup('env', 'TIME_ZONE')               | default('America/Sao_Paulo', true) }}"
-django_language_code:    "{{ lookup('env', 'LANGUAGE_CODE')           | default('pt-br',             true) }}"
+django_language_code:    "{{ lookup('env', 'LANGUAGE_CODE')           | default('en-us',             true) }}"
 celery_broker_url:       "{{ lookup('env', 'CELERY_BROKER_URL')       | default('amqp://guest:guest@localhost:5672/', true) }}"
+
+# Hostname público do GeoNode — floating IP ou FQDN.
+# Define o server_name do Nginx e deve ser o endereço pelo qual
+# os usuários acessam externamente.
+# Sem floating IP, usa o VIP interno como fallback.
+geonode_public_hostname: "{{ lookup('env', 'GEONODE_PUBLIC_HOSTNAME') | default(haproxy_vip, true) }}"
 
 # -----------------------------------------------------------------------------
 # GEOSERVER
@@ -84,13 +90,11 @@ geoserver_cluster_instance_name_read_1: "{{ lookup('env', 'GEOSERVER_CLUSTER_INS
 geoserver_cluster_instance_name_read_2: "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_READ_2') | default('geoserver-worker-2', true) }}"
 
 # Plugins
-# GEOSERVER_PLUGINS: lista separada por vírgula dos plugins a instalar.
-# Plugins disponíveis: jms-cluster, geofence-server, control-flow, monitor
 geoserver_plugins: "{{ lookup('env', 'GEOSERVER_PLUGINS') | default('jms-cluster,geofence-server,monitor,control-flow', true) }}"
 
 # Backend do geofence-server.
-# postgres → recomendado para produção (requer PostgreSQL externo configurado)
-# h2       → apenas para testes/demo (banco embarcado, incompatível com outros plugins H2)
+# postgres → recomendado para produção
+# h2       → apenas para testes/demo
 geofence_backend: "{{ lookup('env', 'GEOFENCE_BACKEND') | default('postgres', true) }}"
 
 # -----------------------------------------------------------------------------
