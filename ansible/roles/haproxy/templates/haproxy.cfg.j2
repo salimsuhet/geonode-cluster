@@ -102,7 +102,7 @@ backend geoserver_write
     balance     roundrobin
     option      httpchk
     http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host {{ ip_geoserver_write }}
-    http-check  expect status 200 302
+    http-check  expect rstatus 200|302
 
     # Sticky session baseado em cookie JSESSIONID
     cookie SERVERID insert indirect nocache
@@ -121,7 +121,7 @@ backend geoserver_read
     balance     leastconn
     option      httpchk
     http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host {{ ip_geoserver_write }}
-    http-check  expect status 200 302
+    http-check  expect rstatus 200|302
 
     http-request set-header X-Forwarded-Host %[req.hdr(Host)]
     http-request set-header X-Real-IP       %[src]
