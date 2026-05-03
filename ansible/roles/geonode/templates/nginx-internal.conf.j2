@@ -1,53 +1,11 @@
-# nginx-internal.conf — GeoNode
-# Gerenciado pelo Ansible
+# Gerenciado pelo Ansible — incluído dentro do server block principal do Nginx.
 #
-# Server block extra que aceita requests pelo IP interno do GeoNode.
-# Necessário para que o GeoServer consiga chamar os endpoints OAuth2
-# (/o/token/ e /api/o/v4/tokeninfo/) diretamente pela rede privada,
-# evitando o problema de hairpin NAT do OpenStack (instâncias não
-# conseguem alcançar o próprio Floating IP a partir da rede interna).
+# Adiciona o IP interno do GeoNode ao server_name do bloco existente.
+# No Nginx, múltiplas diretivas server_name dentro do mesmo server block
+# são aditivas — este arquivo soma 192.168.1.101 aos nomes já definidos
+# (200.137.68.74 e 127.0.0.1), sem criar um novo bloco.
 #
-# O bloco principal do Nginx (nginx.conf) só aceita o hostname público
-# no server_name. Qualquer request com Host diferente cai no
-# default_server que retorna 444. Este arquivo adiciona o IP interno
-# como server_name alternativo, roteando para o mesmo Django upstream.
-
-server {
-    listen 80;
-    server_name {{ ip_geonode }};
-
-    charset utf-8;
-    client_max_body_size 100G;
-
-    proxy_connect_timeout 600;
-    proxy_send_timeout    600;
-    proxy_read_timeout    600;
-
-    # OAuth2 token endpoint — usado pelo GeoServer server-side
-    location /o/ {
-        set $upstream django:8000;
-
-        proxy_redirect          off;
-        proxy_set_header        Host {{ ip_geonode }};
-        proxy_set_header        X-Real-IP $remote_addr;
-        proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header        X-Forwarded-Proto http;
-        proxy_request_buffering off;
-
-        proxy_pass http://$upstream;
-    }
-
-    # tokeninfo endpoint — usado pelo GeoServer server-side
-    location /api/o/ {
-        set $upstream django:8000;
-
-        proxy_redirect          off;
-        proxy_set_header        Host {{ ip_geonode }};
-        proxy_set_header        X-Real-IP $remote_addr;
-        proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header        X-Forwarded-Proto http;
-        proxy_request_buffering off;
-
-        proxy_pass http://$upstream;
-    }
-}
+# Necessário para que o GeoServer consiga chamar /o/token/ e
+# /api/o/v4/tokeninfo/ diretamente pela rede privada do OpenStack,
+# evitando hairpin NAT (instâncias não alcançam o próprio Floating IP).
+server_name {{ ip_geonode }};
