@@ -1,203 +1,181 @@
 ---
-# roles/geoserver/tasks/main.yml
-# Deploya o GeoServer via Docker em cada nó (write ou read)
-# A variável `geoserver_role` (write|read) e `geoserver_is_master` (bool)
-# são definidas no inventário por host.
+# roles/geonode/tasks/main.yml
 
-# ------------------------------------------------------------------
-# Usuário e grupos
-# ------------------------------------------------------------------
-- name: Cria grupo geoserver
-  group:
-    name: geoserver
-    state: present
-  tags: [geoserver]
-
-- name: Cria usuário geoserver
-  user:
-    name: geoserver
-    group: geoserver
-    groups: docker
-    append: yes
-    shell: /usr/sbin/nologin
-    home: /opt/geoserver
-    create_home: no
-    system: yes
-    state: present
-  tags: [geoserver]
-
-- name: Cria estrutura de diretórios GeoServer
+- name: Cria diretórios GeoNode
   file:
     path: "{{ item }}"
     state: directory
-    owner: geoserver
-    group: geoserver
+    owner: "{{ ansible_user }}"
     mode: '0755'
   loop:
-    - "{{ geoserver_data_dir }}"
-    - "{{ geoserver_data_dir }}/logs"
-    - "{{ geoserver_data_dir }}/gwc"
-    - "{{ geoserver_data_dir }}/security/filter/geonode-oauth2"
-    - /opt/geoserver/config
-  tags: [geoserver]
+    - /opt/geonode
+    - /opt/geonode/static
+    - /opt/geonode/media
+    - /opt/geonode/backup
+  tags: [geonode]
 
-# ------------------------------------------------------------------
-# Pré-população do data dir (apenas no master — workers herdam via NFS)
-# ------------------------------------------------------------------
-- name: Pré-popula data dir com configuração padrão da imagem (primeira execução)
-  shell: |
-    docker run --rm \
-      -v {{ geoserver_data_dir }}:/target \
-      --entrypoint sh \
-      {{ geoserver_image }} \
-      -c "cp -rn /usr/local/tomcat/webapps/geoserver/data/. /target/"
-    chown -R geoserver:geoserver {{ geoserver_data_dir }}
-  args:
-    creates: "{{ geoserver_data_dir }}/global.xml"
-  tags: [geoserver]
-
-# ------------------------------------------------------------------
-# Script corrigido do entrypoint da imagem geonode/geoserver.
-#
-# O set_geoserver_auth.sh original adiciona `echo " " >> file` antes
-# de processar cada arquivo XML de segurança (config.xml do OAuth2,
-# role service, auth provider e global.xml). Esse trailing whitespace
-# causa java.io.EOFException no XStream ao carregar as configurações
-# durante a autenticação OAuth2.
-#
-# Montamos uma versão corrigida (sem o echo) via volume no docker-compose,
-# sobrescrevendo o script da imagem antes do container iniciar.
-# ------------------------------------------------------------------
-- name: Copia set_geoserver_auth.sh corrigido para o host
-  copy:
-    src: set_geoserver_auth.sh
-    dest: /opt/geoserver/set_geoserver_auth.sh
-    owner: root
-    group: root
-    mode: '0755'
-  notify: Restart GeoServer
-  tags: [geoserver, oauth2]
-
-# ------------------------------------------------------------------
-# Plugins (baixa apenas no master; workers herdam via NFS)
-# ------------------------------------------------------------------
-- name: Cria diretório de plugins
-  file:
-    path: /opt/geoserver/plugins
-    state: directory
-    owner: geoserver
-    mode: '0755'
-  when: geoserver_is_master | bool
-  tags: [geoserver, plugins]
-
-- name: Download e instalação dos plugins GeoServer
-  include_tasks: plugins.yml
-  when: geoserver_is_master | bool
-  tags: [geoserver, plugins]
-
-# ------------------------------------------------------------------
-# Configuração OAuth2 — cria o config.xml do filtro geonode-oauth2
-#
-# ATENÇÃO: o campo <cliendId> (sem 't') é intencional — é o nome
-# do campo Java na classe GeoNodeOAuthAuthenticationFilterConfig.
-# O XStream deserializa pelo nome do campo, não pelo nome semântico.
-# Corrigir para <clientId> faz o plugin retornar client_id=null.
-#
-# Só aplica no master e se oauth2_client_id estiver definido.
-# ------------------------------------------------------------------
-- name: Cria config.xml do filtro OAuth2 do GeoServer
+- name: Copia docker-compose do GeoNode
   template:
-    src: geonode-oauth2.config.xml.j2
-    dest: "{{ geoserver_data_dir }}/security/filter/geonode-oauth2/config.xml"
-    owner: geoserver
-    group: geoserver
+    src: docker-compose.geonode.yml.j2
+    dest: /opt/geonode/docker-compose.yml
     mode: '0644'
-  when:
-    - geoserver_is_master | bool
-    - oauth2_client_id | length > 0
-  notify: Restart GeoServer
-  tags: [geoserver, oauth2]
+  notify: Restart GeoNode
+  tags: [geonode, config]
 
-# ------------------------------------------------------------------
-# Corrige o proxyBaseUrl no global.xml para usar o hostname público.
-# Sem isso, o Spring Security monta o form action com o IP interno
-# do VIP e a CSP (form-action 'self') bloqueia o login OAuth2.
-# Usa replace (regex) para evitar dependência de lxml no host remoto.
-# ------------------------------------------------------------------
-- name: Corrige proxyBaseUrl no global.xml do GeoServer
-  replace:
-    path: "{{ geoserver_data_dir }}/global.xml"
-    regexp: '<proxyBaseUrl>.*</proxyBaseUrl>'
-    replace: '<proxyBaseUrl>http://{{ geonode_public_hostname }}/geoserver</proxyBaseUrl>'
-  when: geoserver_is_master | bool
-  notify: Restart GeoServer
-  tags: [geoserver, oauth2]
-
-# ------------------------------------------------------------------
-# Configuração de clustering JMS
-# ------------------------------------------------------------------
-- name: Cria arquivo cluster.properties
+- name: Gera .env do GeoNode
   template:
-    src: cluster.properties.j2
-    dest: "{{ geoserver_data_dir }}/cluster.properties"
-    owner: geoserver
-    group: geoserver
-    mode: '0644'
-  notify: Restart GeoServer
-  tags: [geoserver, config]
-
-# ------------------------------------------------------------------
-# Docker Compose
-# ------------------------------------------------------------------
-- name: Gera docker-compose.yml do GeoServer
-  template:
-    src: docker-compose.geoserver.yml.j2
-    dest: /opt/geoserver/docker-compose.yml
-    owner: geoserver
-    group: geoserver
-    mode: '0644'
-  notify: Restart GeoServer
-  tags: [geoserver, config]
-
-- name: Gera .env do GeoServer
-  template:
-    src: geoserver.env.j2
-    dest: /opt/geoserver/.env
-    owner: geoserver
-    group: geoserver
+    src: geonode.env.j2
+    dest: /opt/geonode/.env
     mode: '0600'
-  notify: Restart GeoServer
-  tags: [geoserver, config]
+  notify: Restart GeoNode
+  tags: [geonode, config]
 
-- name: Cria serviço systemd para GeoServer
+# ------------------------------------------------------------------
+# nginx-internal.conf — server block extra para o IP interno do GeoNode.
+# Permite que o GeoServer chame /o/token/ e /api/o/v4/tokeninfo/
+# diretamente pela rede privada, evitando hairpin NAT do OpenStack.
+# ------------------------------------------------------------------
+- name: Gera nginx-internal.conf para aceitar IP interno
   template:
-    src: geoserver.service.j2
-    dest: /etc/systemd/system/geoserver.service
+    src: nginx-internal.conf.j2
+    dest: /opt/geonode/nginx-internal.conf
+    mode: '0644'
+  notify: Restart GeoNode
+  tags: [geonode, config, oauth2]
+
+- name: Cria serviço systemd GeoNode
+  template:
+    src: geonode.service.j2
+    dest: /etc/systemd/system/geonode.service
     mode: '0644'
   notify:
     - Reload systemd
-    - Restart GeoServer
-  tags: [geoserver]
+    - Restart GeoNode
+  tags: [geonode]
 
-- name: Habilita e inicia serviço GeoServer
+- name: Habilita e inicia GeoNode
   systemd:
-    name: geoserver
+    name: geonode
     enabled: yes
     state: started
     daemon_reload: yes
-  tags: [geoserver]
+  tags: [geonode]
+
+# O Nginx da imagem geonode/nginx bloqueia requests com Host: localhost
+# retornando 444. Usa-se 127.0.0.1 que está sempre no server_name.
+- name: Aguarda GeoNode responder (até 10 minutos)
+  uri:
+    url: "http://127.0.0.1/api/v2/resources/"
+    status_code: [200, 401, 403]
+    timeout: 10
+  register: gn_health
+  until: gn_health.status in [200, 401, 403]
+  retries: 60
+  delay: 10
+  tags: [geonode]
+
+- name: Executa migrações Django
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: python manage.py migrate --noinput
+  register: migrate_result
+  changed_when: "'No migrations to apply' not in migrate_result.stdout"
+  tags: [geonode, migrate]
+
+- name: Cria superusuário GeoNode
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: >-
+      python manage.py shell -c
+      "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='{{ geonode_admin_user }}').exists() or User.objects.create_superuser('{{ geonode_admin_user }}', '{{ geonode_admin_email }}', '{{ geonode_admin_password }}')"
+  changed_when: false
+  tags: [geonode, users]
+
+- name: Coleta arquivos estáticos
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: python manage.py collectstatic --noinput
+  changed_when: false
+  tags: [geonode, static]
 
 # ------------------------------------------------------------------
-# Healthcheck (aguarda GeoServer subir antes de continuar)
+# Troca de senha do admin do GeoServer.
+#
+# O entrypoint da imagem geonode/geoserver não processa
+# GEOSERVER_ADMIN_PASSWORD — a senha inicial é sempre a factory
+# password ("geoserver"). O invoke prepare do GeoNode faz a troca,
+# mas só funciona se o GeoServer ainda estiver com a factory password.
+#
+# Esta task troca a senha diretamente via REST API do GeoServer,
+# usando a factory password como credencial atual. É idempotente:
+# se a senha já foi trocada, o curl retorna 401 e a task é ignorada.
 # ------------------------------------------------------------------
-- name: Aguarda GeoServer responder (até 5 minutos)
+- name: Aguarda GeoServer responder antes de trocar senha (até 5 minutos)
   uri:
-    url: "http://localhost:{{ geoserver_port }}/geoserver/web/"
-    status_code: [200, 302]
+    url: "http://{{ ip_geoserver_write }}:{{ geoserver_port }}/geoserver/rest/about/version.json"
+    status_code: [200, 401]
     timeout: 10
-  register: gs_health
-  until: gs_health.status in [200, 302]
+    user: admin
+    password: "{{ geoserver_admin_password }}"
+    force_basic_auth: yes
+  register: gs_auth_check
+  until: gs_auth_check.status in [200, 401]
   retries: 30
   delay: 10
-  when: geoserver_is_master | bool
-  tags: [geoserver]
+  tags: [geonode, geoserver_password]
+
+- name: Troca senha do admin do GeoServer (factory → configurada)
+  uri:
+    url: "http://{{ ip_geoserver_write }}:{{ geoserver_port }}/geoserver/rest/security/self.json"
+    method: PUT
+    body_format: json
+    body:
+      user:
+        userName: admin
+        password: "{{ geoserver_admin_password }}"
+        enabled: true
+    status_code: [200, 201, 204, 401]
+    user: admin
+    password: "{{ geoserver_factory_password }}"
+    force_basic_auth: yes
+  register: gs_pw_change
+  # 401 significa que a factory password não é mais válida
+  # (senha já foi trocada em deploy anterior) — não é erro
+  failed_when: gs_pw_change.status not in [200, 201, 204, 401]
+  changed_when: gs_pw_change.status in [200, 201, 204]
+  tags: [geonode, geoserver_password]
+
+# ------------------------------------------------------------------
+# invoke prepare configura OAuth2 e fixtures de integração com GeoServer.
+# Roda após a troca de senha para garantir que usa a senha correta.
+# Se oauth2_client_id estiver vazio, pula.
+# ------------------------------------------------------------------
+- name: Executa invoke prepare (configura OAuth2 e GeoServer)
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: invoke prepare
+    env:
+      OAUTH2_CLIENT_ID: "{{ oauth2_client_id }}"
+      OAUTH2_CLIENT_SECRET: "{{ oauth2_client_secret }}"
+  changed_when: false
+  when: oauth2_client_id | length > 0
+  tags: [geonode, oauth2]
+
+# ------------------------------------------------------------------
+# O invoke prepare gera redirect_uris como {SITEURL}geoserver/index.html
+# O GeoServer usa /geoserver/index.html como redirectUri no OAuth2.
+# Garantimos que ambos os paths estejam registrados.
+# ------------------------------------------------------------------
+- name: Corrige redirect URIs da aplicação OAuth2
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: >-
+      python manage.py shell -c
+      "from oauth2_provider.models import Application;
+      app = Application.objects.filter(name='GeoServer').first();
+      app and setattr(app, 'redirect_uris', 'http://{{ geonode_public_hostname }}/geoserver/web/\nhttp://{{ geonode_public_hostname }}/geoserver/index.html') or None;
+      app and app.save();
+      print('redirect_uris:', app.redirect_uris if app else 'app not found')"
+  changed_when: false
+  when: oauth2_client_id | length > 0
+  tags: [geonode, oauth2]
