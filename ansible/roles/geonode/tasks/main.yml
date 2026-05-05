@@ -103,12 +103,11 @@
 #
 # O entrypoint da imagem geonode/geoserver não processa
 # GEOSERVER_ADMIN_PASSWORD — a senha inicial é sempre a factory
-# password ("geoserver"). O invoke prepare do GeoNode faz a troca,
-# mas só funciona se o GeoServer ainda estiver com a factory password.
+# password ("geoserver"). Esta task troca via REST API usando o
+# endpoint /rest/security/usergroup/users/admin do GeoServer 2.x.
 #
-# Esta task troca a senha diretamente via REST API do GeoServer,
-# usando a factory password como credencial atual. É idempotente:
-# se a senha já foi trocada, o curl retorna 401 e a task é ignorada.
+# É idempotente: se a factory password já não é válida (senha já
+# foi trocada), o PUT retorna 401 e a task é marcada not changed.
 # ------------------------------------------------------------------
 - name: Aguarda GeoServer responder antes de trocar senha (até 5 minutos)
   uri:
@@ -126,11 +125,11 @@
 
 - name: Troca senha do admin do GeoServer (factory → configurada)
   uri:
-    url: "http://{{ ip_geoserver_write }}:{{ geoserver_port }}/geoserver/rest/security/self.json"
-    method: PUT
+    url: "http://{{ ip_geoserver_write }}:{{ geoserver_port }}/geoserver/rest/security/usergroup/service/default/user/admin"
+    method: POST
     body_format: json
     body:
-      user:
+      org.geoserver.rest.security.xml.JaxbUser:
         userName: admin
         password: "{{ geoserver_admin_password }}"
         enabled: true
@@ -139,11 +138,12 @@
     password: "{{ geoserver_factory_password }}"
     force_basic_auth: yes
   register: gs_pw_change
-  # 401 significa que a factory password não é mais válida
-  # (senha já foi trocada em deploy anterior) — não é erro
+  # 401 = factory password já não é válida (senha já foi trocada)
+  # 405 = endpoint não suporta POST (usa PUT nessa versão)
   failed_when: gs_pw_change.status not in [200, 201, 204, 401]
   changed_when: gs_pw_change.status in [200, 201, 204]
   tags: [geonode, geoserver_password]
+
 
 # ------------------------------------------------------------------
 # invoke prepare configura OAuth2 e fixtures de integração com GeoServer.
