@@ -83,6 +83,12 @@ geoserver_port:           "{{ lookup('env', 'GEOSERVER_PORT')           | defaul
 geoserver_data_dir:       "{{ lookup('env', 'GEOSERVER_DATA_DIR')       | default('/opt/geoserver_data', true) }}"
 geoserver_java_opts:      "{{ lookup('env', 'GEOSERVER_JAVA_OPTS')      | default('-Xms2g -Xmx4g -XX:+UseG1GC', true) }}"
 
+# Senha de fábrica da imagem geonode/geoserver.
+# O entrypoint não processa GEOSERVER_ADMIN_PASSWORD — a senha inicial
+# é sempre "geoserver". O Ansible usa esta variável para trocar a senha
+# via REST API após o primeiro boot. Não altere este default.
+geoserver_factory_password: "{{ lookup('env', 'GEOSERVER_FACTORY_PASSWORD') | default('geoserver', true) }}"
+
 # NFS
 nfs_server:       "{{ lookup('env', 'NFS_SERVER')      | default(ip_geoserver_write, true) }}"
 nfs_export_path:  "{{ lookup('env', 'NFS_EXPORT_PATH') | default('/opt/geoserver_data', true) }}"
@@ -116,4 +122,4 @@ haproxy_server_timeout:  "{{ lookup('env', 'HAPROXY_SERVER_TIMEOUT')  | default(
 # -----------------------------------------------------------------------------
 keepalived_vrrp_id:       "{{ lookup('env', 'KEEPALIVED_VRRP_ID')       | default('51',       true) }}"
 keepalived_vrrp_password: "{{ lookup('env', 'KEEPALIVED_VRRP_PASSWORD') | default('changeme', true) }}"
-keepalived_interface:     "{{ lookup('env', 'KEEPALIVED_INTERFACE')     | default('eth1',      true) }}"
+keepalived_interface:     "{{ lookup('env', 'KEEPALIVED_INTERFACE')      | default('eth1',      true) }}"

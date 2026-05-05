@@ -34,8 +34,6 @@
 # nginx-internal.conf — server block extra para o IP interno do GeoNode.
 # Permite que o GeoServer chame /o/token/ e /api/o/v4/tokeninfo/
 # diretamente pela rede privada, evitando hairpin NAT do OpenStack.
-# O bloco principal do Nginx só aceita o hostname público; qualquer
-# outro Host cai no default_server que retorna 444.
 # ------------------------------------------------------------------
 - name: Gera nginx-internal.conf para aceitar IP interno
   template:
@@ -100,9 +98,58 @@
   changed_when: false
   tags: [geonode, static]
 
+# ------------------------------------------------------------------
+# Troca de senha do admin do GeoServer.
+#
+# O entrypoint da imagem geonode/geoserver não processa
+# GEOSERVER_ADMIN_PASSWORD — a senha inicial é sempre a factory
+# password ("geoserver"). O invoke prepare do GeoNode faz a troca,
+# mas só funciona se o GeoServer ainda estiver com a factory password.
+#
+# Esta task troca a senha diretamente via REST API do GeoServer,
+# usando a factory password como credencial atual. É idempotente:
+# se a senha já foi trocada, o curl retorna 401 e a task é ignorada.
+# ------------------------------------------------------------------
+- name: Aguarda GeoServer responder antes de trocar senha (até 5 minutos)
+  uri:
+    url: "http://{{ ip_geoserver_write }}:{{ geoserver_port }}/geoserver/rest/about/version.json"
+    status_code: [200, 401]
+    timeout: 10
+    user: admin
+    password: "{{ geoserver_admin_password }}"
+    force_basic_auth: yes
+  register: gs_auth_check
+  until: gs_auth_check.status in [200, 401]
+  retries: 30
+  delay: 10
+  tags: [geonode, geoserver_password]
+
+- name: Troca senha do admin do GeoServer (factory → configurada)
+  uri:
+    url: "http://{{ ip_geoserver_write }}:{{ geoserver_port }}/geoserver/rest/security/self.json"
+    method: PUT
+    body_format: json
+    body:
+      user:
+        userName: admin
+        password: "{{ geoserver_admin_password }}"
+        enabled: true
+    status_code: [200, 201, 204, 401]
+    user: admin
+    password: "{{ geoserver_factory_password }}"
+    force_basic_auth: yes
+  register: gs_pw_change
+  # 401 significa que a factory password não é mais válida
+  # (senha já foi trocada em deploy anterior) — não é erro
+  failed_when: gs_pw_change.status not in [200, 201, 204, 401]
+  changed_when: gs_pw_change.status in [200, 201, 204]
+  tags: [geonode, geoserver_password]
+
+# ------------------------------------------------------------------
 # invoke prepare configura OAuth2 e fixtures de integração com GeoServer.
-# Requer OAUTH2_CLIENT_ID e OAUTH2_CLIENT_SECRET no .env.
-# Se as variáveis estiverem vazias, pula silenciosamente.
+# Roda após a troca de senha para garantir que usa a senha correta.
+# Se oauth2_client_id estiver vazio, pula.
+# ------------------------------------------------------------------
 - name: Executa invoke prepare (configura OAuth2 e GeoServer)
   community.docker.docker_container_exec:
     container: geonode_django
@@ -114,9 +161,11 @@
   when: oauth2_client_id | length > 0
   tags: [geonode, oauth2]
 
+# ------------------------------------------------------------------
 # O invoke prepare gera redirect_uris como {SITEURL}geoserver/index.html
-# mas o GeoServer usa /geoserver/web/ para o redirect OAuth2.
-# Corrigimos aqui para usar a URL correta do web UI.
+# O GeoServer usa /geoserver/index.html como redirectUri no OAuth2.
+# Garantimos que ambos os paths estejam registrados.
+# ------------------------------------------------------------------
 - name: Corrige redirect URIs da aplicação OAuth2
   community.docker.docker_container_exec:
     container: geonode_django
