@@ -79,6 +79,26 @@
   tags: [geoserver, oauth2]
 
 # ------------------------------------------------------------------
+# Script wrapper de entrypoint — copia JARs dos plugins para WEB-INF/lib
+#
+# O classloader do Tomcat NÃO recursiona subdirectórios de WEB-INF/lib.
+# Portanto os JARs precisam estar no diretório raiz de WEB-INF/lib,
+# não em WEB-INF/lib/algum-subdir/. Como o container é read-only na camada
+# de imagem, o copy precisa acontecer em runtime, antes do Tomcat iniciar.
+# Este script é montado como entrypoint do container; ao final executa o
+# CMD original da imagem (exec "$@").
+# ------------------------------------------------------------------
+- name: Copia copy-plugins.sh (entrypoint wrapper) para o host
+  copy:
+    src: copy-plugins.sh
+    dest: /opt/geoserver/copy-plugins.sh
+    owner: root
+    group: root
+    mode: '0755'
+  notify: Restart GeoServer
+  tags: [geoserver, plugins]
+
+# ------------------------------------------------------------------
 # Plugins (baixa apenas no master; workers herdam via NFS)
 # ------------------------------------------------------------------
 - name: Cria diretório de plugins
@@ -187,10 +207,15 @@
 # ------------------------------------------------------------------
 # Configuração de clustering JMS
 # ------------------------------------------------------------------
-- name: Cria arquivo cluster.properties
+# cluster.properties é escrito em /opt/geoserver/cluster.properties (caminho LOCAL
+# do host, fora do NFS). O docker-compose monta esse arquivo sobre
+# /opt/geoserver/data_dir/cluster.properties dentro do container, sobrepondo
+# o arquivo do data_dir compartilhado. Sem isso, o Ansible do worker escreve
+# no data_dir (montado via NFS do master) e sobrescreve a config do master.
+- name: Cria arquivo cluster.properties (caminho local — fora do NFS)
   template:
     src: cluster.properties.j2
-    dest: "{{ geoserver_data_dir }}/cluster.properties"
+    dest: /opt/geoserver/cluster.properties
     owner: geoserver
     group: geoserver
     mode: '0644'

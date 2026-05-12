@@ -11,9 +11,20 @@ services:
       - .env
     ports:
       - "{{ geoserver_port }}:8080"
+    # O entrypoint wrapper copia os JARs de /opt/additional_plugins para WEB-INF/lib
+    # antes de iniciar o Tomcat. O classloader do Tomcat carrega JARs apenas do
+    # diretório raiz de WEB-INF/lib — nunca de subdirectórios — por isso a montagem
+    # anterior em .../WEB-INF/lib/extra era ineficaz e o menu JMS-Cluster não aparecia.
+    entrypoint: ["/bin/bash", "/usr/local/bin/copy-plugins.sh"]
+
     volumes:
       - {{ geoserver_data_dir }}:/opt/geoserver/data_dir
-      - {{ geoserver_data_dir }}/plugins:/opt/geoserver/webapps/geoserver/WEB-INF/lib/extra
+      - {{ geoserver_data_dir }}/plugins:/opt/additional_plugins:ro
+      # cluster.properties local (fora do NFS) sobrepõe o arquivo compartilhado.
+      # O data_dir dos workers é montado via NFS do master; sem este mount,
+      # o Ansible do worker sobrescreve o cluster.properties do master.
+      - /opt/geoserver/cluster.properties:/opt/geoserver/data_dir/cluster.properties
+      - /opt/geoserver/copy-plugins.sh:/usr/local/bin/copy-plugins.sh:ro
       - {{ geoserver_data_dir }}/logs:/opt/geoserver/logs
       # set_geoserver_auth.sh corrigido: remove a linha `echo " " >> file`
       # do script original da imagem, que adicionava trailing whitespace nos
@@ -26,18 +37,14 @@ services:
       GEOWEBCACHE_CACHE_DIR: /opt/geoserver/data_dir/gwc
       # JAVA_OPTS em uma linha só — docker-compose não tem o problema do .env com multilinha
       JAVA_OPTS: "{{ geoserver_java_opts }}"
+      # Propriedades do JMS-Cluster relevantes via sistema.
+      # A configuração completa (instanceName, topicName, durable, etc.)
+      # é lida pelo plugin do arquivo cluster.properties no data_dir.
+      # REMOVIDO: -Dorg.geoserver.cluster.hazelcast.* são propriedades do
+      # plugin Hazelcast e não têm efeito algum no JMS-Cluster.
       CATALINA_OPTS: >-
         -DGEOSERVER_CSRF_DISABLED=true
-{% if geoserver_is_master | bool %}
-        -Dorg.geoserver.cluster.hazelcast.INSTANCE_NAME={{ geoserver_cluster_instance_name_write }}
-        -Dorg.geoserver.cluster.hazelcast.IS_MASTER=true
         -Dorg.geoserver.cluster.jms.broker={{ geoserver_cluster_broker_url }}
-{% else %}
-        -Dorg.geoserver.cluster.hazelcast.INSTANCE_NAME={{ geoserver_cluster_instance_name_read_1 if inventory_hostname == 'geoserver-read-1' else geoserver_cluster_instance_name_read_2 }}
-        -Dorg.geoserver.cluster.hazelcast.IS_MASTER=false
-        -Dorg.geoserver.cluster.hazelcast.MASTER_ADDRESS={{ ip_geoserver_write }}
-        -Dorg.geoserver.cluster.jms.broker={{ geoserver_cluster_broker_url }}
-{% endif %}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/geoserver/web/"]
       interval: 30s
@@ -70,7 +77,9 @@ services:
     networks:
       - geoserver_cluster
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8161/api/health || exit 1"]
+      # /api/health não existe no ActiveMQ 5.18. Verifica a porta OpenWire
+      # (61616) via builtin TCP do bash — sem dependência de curl nem auth.
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/61616' 2>/dev/null"]
       interval: 30s
       timeout: 10s
       retries: 5

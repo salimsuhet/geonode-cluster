@@ -18,6 +18,12 @@ gwc_cache_dir: "{{ lookup('env', 'GWC_CACHE_DIR') | default(geoserver_data_dir ~
 # Plugins a instalar
 geoserver_plugins: "{{ lookup('env', 'GEOSERVER_PLUGINS') | default('jms-cluster,geofence-server,monitor,control-flow', true) }}"
 
+# Startup command da imagem geonode/geoserver — passado como CMD ao entrypoint wrapper.
+# A imagem usa /usr/local/bin/startup.sh como ENTRYPOINT sem CMD definido;
+# o command: no docker-compose preenche $@ para que o exec "$@" no wrapper funcione.
+# Se a imagem mudar, ajuste este valor via GEOSERVER_STARTUP_CMD no .env.
+geoserver_startup_cmd: "{{ lookup('env', 'GEOSERVER_STARTUP_CMD') | default('/usr/local/bin/startup.sh', true) }}"
+
 # Cluster JMS
 geoserver_cluster_broker_url:           "{{ lookup('env', 'GEOSERVER_CLUSTER_BROKER_URL')           | default('tcp://' ~ ip_geoserver_write ~ ':61666', true) }}"
 geoserver_cluster_instance_name_write:  "{{ lookup('env', 'GEOSERVER_CLUSTER_INSTANCE_NAME_WRITE')  | default('geoserver-master',   true) }}"

@@ -1,7 +1,7 @@
 # cluster.properties — JMS Cluster GeoServer
 # Gerenciado pelo Ansible — {{ inventory_hostname }}
 
-# Identificação da instância
+# Identificação da instância e do cluster
 {% if geoserver_is_master | bool %}
 instanceName={{ geoserver_cluster_instance_name_write }}
 {% elif inventory_hostname == 'geoserver-read-1' %}
@@ -9,10 +9,20 @@ instanceName={{ geoserver_cluster_instance_name_read_1 }}
 {% else %}
 instanceName={{ geoserver_cluster_instance_name_read_2 }}
 {% endif %}
+group=geoserver-cluster
 readOnly={{ 'false' if geoserver_is_master | bool else 'true' }}
 
-# Broker JMS (ActiveMQ no master)
+# Broker JMS (ActiveMQ)
+# Master: usa nome de serviço Docker na rede interna (evita hairpin NAT no OpenStack)
+# Workers: usam IP privado do master + porta externa mapeada pelo Docker (61666)
+{% if geoserver_is_master | bool %}
+brokerURL=tcp://activemq:61616
+{% else %}
 brokerURL={{ geoserver_cluster_broker_url }}
+{% endif %}
+
+# Broker embutido desabilitado — usamos o ActiveMQ externo
+embeddedBroker=false
 
 # Tópico de eventos de configuração
 topicName=VirtualTopic.geoserver
@@ -21,8 +31,5 @@ topicName=VirtualTopic.geoserver
 durable=true
 
 # Reconexão automática
-reconnectAttempts=10
-reconnectDelay=5000
-
-# Timeout de conexão
-connectionTimeout=30000
+connection.retry=10
+connection.maxwait=5000
