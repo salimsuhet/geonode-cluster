@@ -16,6 +16,14 @@ services:
     # diretório raiz de WEB-INF/lib — nunca de subdirectórios — por isso a montagem
     # anterior em .../WEB-INF/lib/extra era ineficaz e o menu JMS-Cluster não aparecia.
     entrypoint: ["/bin/bash", "/usr/local/bin/copy-plugins.sh"]
+{% if geoserver_is_master | bool %}
+    # Aguarda o ActiveMQ estar healthy antes de iniciar o GeoServer.
+    # Sem isso, o GeoServer tenta conectar ao broker antes dele estar pronto,
+    # a primeira tentativa JMS falha e o cluster não se forma após o deploy.
+    depends_on:
+      activemq:
+        condition: service_healthy
+{% endif %}
 
     volumes:
       - {{ geoserver_data_dir }}:/opt/geoserver/data_dir
@@ -37,14 +45,17 @@ services:
       GEOWEBCACHE_CACHE_DIR: /opt/geoserver/data_dir/gwc
       # JAVA_OPTS em uma linha só — docker-compose não tem o problema do .env com multilinha
       JAVA_OPTS: "{{ geoserver_java_opts }}"
-      # Propriedades do JMS-Cluster relevantes via sistema.
-      # A configuração completa (instanceName, topicName, durable, etc.)
-      # é lida pelo plugin do arquivo cluster.properties no data_dir.
-      # REMOVIDO: -Dorg.geoserver.cluster.hazelcast.* são propriedades do
-      # plugin Hazelcast e não têm efeito algum no JMS-Cluster.
+      # Broker URL via system property.
+      # Master: usa nome de serviço Docker (evita hairpin NAT no OpenStack —
+      # o container não consegue alcançar o próprio IP externo pela rede privada).
+      # Workers: usam IP privado do master + porta externa 61666.
       CATALINA_OPTS: >-
         -DGEOSERVER_CSRF_DISABLED=true
+{% if geoserver_is_master | bool %}
+        -Dorg.geoserver.cluster.jms.broker=tcp://activemq:61616
+{% else %}
         -Dorg.geoserver.cluster.jms.broker={{ geoserver_cluster_broker_url }}
+{% endif %}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/geoserver/web/"]
       interval: 30s
