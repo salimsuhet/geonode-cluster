@@ -76,11 +76,24 @@ frontend http_frontend
     acl is_geoserver        path_beg /geoserver
     acl is_geoserver_admin  path_beg /geoserver/web
     acl is_geoserver_admin  path_beg /geoserver/j_spring_security
+    # OAuth2: callback do browser após autorização
+    # redirectUri=.../geoserver → path exato
+    acl is_geoserver_admin  path /geoserver
+    # redirectUri=.../geoserver/index.html → path com prefixo
+    acl is_geoserver_admin  path_beg /geoserver/index.html
+    # OAuth2: path após rewrite do HAProxy (login/logout sem prefixo /web/)
+    acl is_geoserver_admin  path_beg /geoserver/j_spring_oauth2
     acl is_write_method     method   POST PUT DELETE PATCH
     acl is_wfs_transaction  path_sub -i service=WFS request=Transaction
     acl is_wcs_write        path_sub -i service=WCS request=Insert
     acl is_wcs_write        path_sub -i service=WCS request=Delete
     acl is_wcs_write        path_sub -i service=WCS request=Update
+
+    # Rewrite OAuth2: o Wicket gera o form action como URL relativa à
+    # página /geoserver/web/, resultando em /geoserver/web/j_spring_oauth2_*.
+    # O Spring Security escuta em /geoserver/j_spring_oauth2_* (sem /web/).
+    http-request set-path /geoserver/j_spring_oauth2_geonode_login if { path /geoserver/web/j_spring_oauth2_geonode_login }
+    http-request set-path /geoserver/j_spring_oauth2_geonode_logout if { path /geoserver/web/j_spring_oauth2_geonode_logout }
 
     # Roteamento
     use_backend geoserver_write if is_geoserver is_geoserver_admin

@@ -119,6 +119,57 @@
   tags: [geoserver, oauth2]
 
 # ------------------------------------------------------------------
+# Configuração do security/config.xml — filter chain OAuth2.
+#
+# O pré-populate copia o security/config.xml padrão da imagem, que
+# não tem o filtro geonode-oauth2 na webLogin chain. Este script
+# Python ajusta o arquivo para:
+#   1. Adicionar geonode-oauth2 na chain webLogin
+#   2. Habilitar allowSessionCreation na webLogin (necessário para
+#      o OAuth2 armazenar o state entre redirect e callback)
+#   3. Adicionar geonode-oauth2 na chain webLogout
+#
+# O loginEndpoint no config.xml do filtro é /j_spring_oauth2_geonode_login.
+# O Wicket gera o form action como /geoserver/web/j_spring_oauth2_geonode_login
+# (relativo à página). O HAProxy reescreve esse path para
+# /geoserver/j_spring_oauth2_geonode_login antes de encaminhar ao GeoServer,
+# que é o path que o Spring Security realmente escuta.
+# ------------------------------------------------------------------
+- name: Configura security/config.xml para OAuth2 (webLogin chain)
+  script: configure_security_xml.py {{ geoserver_data_dir }}/security/config.xml
+  args:
+    executable: python3
+  when: geoserver_is_master | bool
+  register: security_xml_result
+  changed_when: "'changed' in security_xml_result.stdout"
+  notify: Restart GeoServer
+  tags: [geoserver, oauth2]
+
+# ------------------------------------------------------------------
+# Restaura o geonode REST role service/config.xml da imagem.
+# O pré-populate via `cp -rn` falha silenciosamente em diretórios
+# com espaço no nome, deixando o arquivo vazio. O XStream do GeoServer
+# lança EOFException ao tentar carregar um arquivo vazio.
+# ------------------------------------------------------------------
+- name: Restaura geonode REST role service/config.xml da imagem
+  # Usa stat + tamanho para detectar arquivo vazio (criado pelo cp -rn com
+  # espaço no nome do diretório). creates: não é suficiente porque o arquivo
+  # pode existir mas estar vazio, causando EOFException no XStream.
+  shell: |
+    docker run --rm --entrypoint sh {{ geoserver_image }} \
+      -c 'cat "/usr/local/tomcat/webapps/geoserver/data/security/role/geonode REST role service/config.xml"' \
+      > "{{ geoserver_data_dir }}/security/role/geonode REST role service/config.xml"
+    chown geoserver:geoserver "{{ geoserver_data_dir }}/security/role/geonode REST role service/config.xml"
+  register: role_service_restore
+  changed_when: true
+  when:
+    - geoserver_is_master | bool
+    - lookup('fileglob', geoserver_data_dir ~ '/security/role/geonode REST role service/config.xml') | length == 0
+      or (lookup('file', geoserver_data_dir ~ '/security/role/geonode REST role service/config.xml', errors='ignore') | default('') | length == 0)
+  notify: Restart GeoServer
+  tags: [geoserver, oauth2]
+
+# ------------------------------------------------------------------
 # Corrige o proxyBaseUrl no global.xml para usar o hostname público.
 # Sem isso, o Spring Security monta o form action com o IP interno
 # do VIP e a CSP (form-action 'self') bloqueia o login OAuth2.
