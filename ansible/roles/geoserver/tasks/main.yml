@@ -42,6 +42,33 @@
   tags: [geoserver]
 
 # ------------------------------------------------------------------
+# GDAL native lib pré-compilada (Ubuntu 22.04 x86_64)
+#
+# libgdal-java não existe no Ubuntu 22.04. A lib foi compilada uma vez
+# via SWIG a partir do fonte GDAL 3.4.1 e commitada em files/.
+# O copy-plugins.sh copia de /opt/geoserver/gdal-native/ para
+# native-jni-lib (java.library.path) antes de o Tomcat iniciar.
+# ------------------------------------------------------------------
+- name: Cria diretório para GDAL native lib
+  file:
+    path: /opt/geoserver/gdal-native
+    state: directory
+    owner: geoserver
+    group: geoserver
+    mode: '0755'
+  tags: [geoserver, gdal]
+
+- name: Copia libgdalalljni.so pré-compilada para o host
+  copy:
+    src: libgdalalljni.so
+    dest: /opt/geoserver/gdal-native/libgdalalljni.so
+    owner: geoserver
+    group: geoserver
+    mode: '0755'
+  notify: Restart GeoServer
+  tags: [geoserver, gdal]
+
+# ------------------------------------------------------------------
 # Pré-população do data dir (apenas no master — workers herdam via NFS)
 # ------------------------------------------------------------------
 - name: Pré-popula data dir com configuração padrão da imagem (primeira execução)

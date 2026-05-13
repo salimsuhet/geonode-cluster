@@ -55,7 +55,29 @@ else
 fi
 
 # ----------------------------------------------------------------
-# 3. Startup: usa $@ se fornecido (override via command:),
+# 3. GDAL native lib
+#
+# libgdalalljni.so é necessária para o plugin gs-gdal (ImageI/O-Ext).
+# O Ansible distribui o .so pré-compilado para /opt/geoserver/gdal-native/
+# (montado em /opt/gdal-native/ no container). Aqui apenas copiamos para
+# native-jni-lib, que já está no java.library.path do Tomcat.
+# ----------------------------------------------------------------
+NATIVE_LIB_DIR="${CATALINA_HOME:-/usr/local/tomcat}/native-jni-lib"
+GDAL_SRC="/opt/gdal-native/libgdalalljni.so"
+HAS_GDAL_PLUGIN=$(find "${SRC_DIR}" -name "gs-gdal-*.jar" 2>/dev/null | head -1)
+
+if [ -n "${HAS_GDAL_PLUGIN}" ] && [ -d "${NATIVE_LIB_DIR}" ]; then
+    if [ -f "${GDAL_SRC}" ]; then
+        cp "${GDAL_SRC}" "${NATIVE_LIB_DIR}/libgdalalljni.so" \
+            && echo "[geoserver-plugins] GDAL native lib instalada." \
+            || echo "[geoserver-plugins] AVISO: falha ao copiar GDAL native lib."
+    else
+        echo "[geoserver-plugins] AVISO: ${GDAL_SRC} não encontrado — GDAL indisponível."
+    fi
+fi
+
+# ----------------------------------------------------------------
+# 4. Startup: usa $@ se fornecido (override via command:),
 #    senão auto-descobre o script de inicialização da imagem.
 # ----------------------------------------------------------------
 if [ $# -gt 0 ]; then

@@ -32,6 +32,9 @@ services:
       # O data_dir dos workers é montado via NFS do master; sem este mount,
       # o Ansible do worker sobrescreve o cluster.properties do master.
       - /opt/geoserver/cluster.properties:/opt/geoserver/data_dir/cluster.properties
+      # lib nativa GDAL pré-compilada — copiada pelo copy-plugins.sh para
+      # native-jni-lib (java.library.path) antes de o Tomcat iniciar.
+      - /opt/geoserver/gdal-native:/opt/gdal-native:ro
       - /opt/geoserver/copy-plugins.sh:/usr/local/bin/copy-plugins.sh:ro
       - {{ geoserver_data_dir }}/logs:/opt/geoserver/logs
       # set_geoserver_auth.sh corrigido: remove a linha `echo " " >> file`
