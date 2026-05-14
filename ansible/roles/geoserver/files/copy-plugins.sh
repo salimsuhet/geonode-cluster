@@ -71,12 +71,22 @@ GDAL_SRC="/opt/gdal-native/libgdalalljni.so"
 HAS_GDAL_PLUGIN=$(find "${SRC_DIR}" -name "gs-gdal-*.jar" 2>/dev/null | head -1)
 
 if [ -n "${HAS_GDAL_PLUGIN}" ] && [ -d "${NATIVE_LIB_DIR}" ]; then
-    # Instala libgdal30 (runtime) se ainda não estiver no container
+    # Instala libgdal30 (runtime) se ainda não estiver no container.
+    # apt-get update é obrigatório em containers recém-criados — os índices
+    # de pacotes estão vazios e o install falha silenciosamente sem ele.
     if ! ldconfig -p 2>/dev/null | grep -q "libgdal.so.30"; then
+        echo "[geoserver-plugins] GDAL: atualizando índices apt..."
+        apt-get update -qq 2>&1 | grep -E "^(E:|Err)" || true
         echo "[geoserver-plugins] GDAL: instalando libgdal30 (runtime)..."
-        apt-get install -y -qq --no-install-recommends libgdal30 2>/dev/null \
-            && echo "[geoserver-plugins] GDAL: libgdal30 instalada." \
-            || echo "[geoserver-plugins] AVISO: falha ao instalar libgdal30."
+        apt-get install -y -qq --no-install-recommends libgdal30 2>&1 \
+            | grep -E "^(E:|Err|Inst )" || true
+        if ldconfig -p 2>/dev/null | grep -q "libgdal.so.30"; then
+            echo "[geoserver-plugins] GDAL: libgdal30 instalada com sucesso."
+        else
+            echo "[geoserver-plugins] ERRO: libgdal30 não encontrada após instalação."
+        fi
+    else
+        echo "[geoserver-plugins] GDAL: libgdal30 já presente."
     fi
 
     # Copia o wrapper JNI para native-jni-lib (java.library.path)
