@@ -142,3 +142,25 @@
   when:
     - "'monitor' in plugin_list"
     - dl_monitor is not failed
+
+- name: Baixa plugin gdal (extensão oficial — ImageI/O-Ext GDAL Coverage Extension)
+  get_url:
+    url: "{{ gs_ext_base_url }}/geoserver-{{ geoserver_version }}-gdal-plugin.zip"
+    dest: "/opt/geoserver/plugins/gdal.zip"
+    owner: geoserver
+    mode: '0644'
+    timeout: 120
+  register: dl_gdal
+  retries: 3
+  delay: 10
+  when: "'gdal' in plugin_list"
+
+- name: Extrai plugin gdal
+  unarchive:
+    src: /opt/geoserver/plugins/gdal.zip
+    dest: "{{ geoserver_data_dir }}/plugins/"
+    remote_src: yes
+    owner: geoserver
+  when:
+    - "'gdal' in plugin_list"
+    - dl_gdal is not failed
