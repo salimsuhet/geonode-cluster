@@ -57,16 +57,29 @@ fi
 # ----------------------------------------------------------------
 # 3. GDAL native lib
 #
-# libgdalalljni.so é necessária para o plugin gs-gdal (ImageI/O-Ext).
-# O Ansible distribui o .so pré-compilado para /opt/geoserver/gdal-native/
-# (montado em /opt/gdal-native/ no container). Aqui apenas copiamos para
-# native-jni-lib, que já está no java.library.path do Tomcat.
+# libgdalalljni.so (JNI wrapper) é distribuída pelo Ansible a partir
+# do arquivo pré-compilado no repositório, montado em /opt/gdal-native/.
+#
+# libgdal30 (runtime GDAL) é instalada via apt dentro do container.
+# Não está na imagem base geonode/geoserver — sem ela, o dynamic linker
+# não resolve libgdal.so.30 e o plugin falha silenciosamente.
+# Em docker restart: apt detecta que já está instalado (no-op, <1s).
+# Em recreate (deploy): reinstala (~5MB, ~5s).
 # ----------------------------------------------------------------
 NATIVE_LIB_DIR="${CATALINA_HOME:-/usr/local/tomcat}/native-jni-lib"
 GDAL_SRC="/opt/gdal-native/libgdalalljni.so"
 HAS_GDAL_PLUGIN=$(find "${SRC_DIR}" -name "gs-gdal-*.jar" 2>/dev/null | head -1)
 
 if [ -n "${HAS_GDAL_PLUGIN}" ] && [ -d "${NATIVE_LIB_DIR}" ]; then
+    # Instala libgdal30 (runtime) se ainda não estiver no container
+    if ! ldconfig -p 2>/dev/null | grep -q "libgdal.so.30"; then
+        echo "[geoserver-plugins] GDAL: instalando libgdal30 (runtime)..."
+        apt-get install -y -qq --no-install-recommends libgdal30 2>/dev/null \
+            && echo "[geoserver-plugins] GDAL: libgdal30 instalada." \
+            || echo "[geoserver-plugins] AVISO: falha ao instalar libgdal30."
+    fi
+
+    # Copia o wrapper JNI para native-jni-lib (java.library.path)
     if [ -f "${GDAL_SRC}" ]; then
         cp "${GDAL_SRC}" "${NATIVE_LIB_DIR}/libgdalalljni.so" \
             && echo "[geoserver-plugins] GDAL native lib instalada." \
