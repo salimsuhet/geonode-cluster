@@ -80,14 +80,8 @@ vagrant --version
 # Atualiza pacotes
 sudo apt update && sudo apt upgrade -y
 
-# Dependências
-sudo apt install -y make python3 python3-pip pipx ruby-full
-
-# Ansible + ansible-lint
-pipx install ansible
-pipx inject ansible ansible-lint
-pipx ensurepath
-source ~/.bashrc
+# Dependências + Ansible via apt (fica em /usr/bin e funciona no make)
+sudo apt install -y make ansible ansible-lint ruby-full
 
 # gem dotenv (usado pelo Vagrantfile)
 gem install dotenv
@@ -139,6 +133,6 @@ make help         # Lista todos os comandos disponíveis
 | VirtualBox | Windows (instalador) | Hypervisor para as VMs do Vagrant |
 | Vagrant | Windows (instalador) | Precisa se comunicar diretamente com o VirtualBox |
 | `make` | WSL2 (`apt install make`) | Executa os atalhos do Makefile |
-| `ansible` + `ansible-lint` | WSL2 (`pipx`) | Provisionamento das VMs |
+| `ansible` + `ansible-lint` | WSL2 (`apt`) | Provisionamento das VMs (apt instala em `/usr/bin`, funciona no `make`) |
 | `ruby` + `gem dotenv` | WSL2 (`apt`) | Leitura do `.env` pelo Vagrantfile |
 | Symlink `vagrant` | WSL2 (`ln -s`) | Permite que o `make` encontre o executável |
