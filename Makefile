@@ -6,10 +6,11 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-ENV_FILE        ?= envs/.env
-VAGRANT_INV     := ansible/inventories/vagrant/hosts.yml
-PRODUCTION_INV  := ansible/inventories/production/hosts.yml
-ANSIBLE_EXTRA   := --extra-vars "@$(ENV_FILE)"
+ENV_FILE        ?= $(CURDIR)/envs/.env
+VARS_FILE       := /tmp/ansible_vars.yml
+VAGRANT_INV     := $(CURDIR)/ansible/inventories/vagrant/hosts.yml
+PRODUCTION_INV  := $(CURDIR)/ansible/inventories/production/hosts.yml
+ANSIBLE_EXTRA   := --extra-vars "@$(VARS_FILE)"
 
 # Detecta inventário de acordo com DEPLOY_MODE no .env
 ifneq (,$(wildcard $(ENV_FILE)))
@@ -23,7 +24,12 @@ else
   INVENTORY := $(PRODUCTION_INV)
 endif
 
-ANSIBLE := cd ansible && ansible-playbook -i ../$(INVENTORY) $(ANSIBLE_EXTRA)
+ANSIBLE := ansible-playbook -i $(INVENTORY) $(ANSIBLE_EXTRA)
+
+# Converte .env (CHAVE=VALOR) → YAML para o Ansible
+$(VARS_FILE): $(ENV_FILE)
+	@grep -v "^#" $(ENV_FILE) | grep -v "^$$" | \
+	  sed 's/^\([^=]*\)=\(.*\)$$/\1: "\2"/' > $(VARS_FILE)
 
 # =============================================================================
 .PHONY: help
@@ -83,81 +89,81 @@ vagrant-ssh: ## SSH na VM (uso: make vagrant-ssh VM=geonode)
 # Deploy completo
 # =============================================================================
 .PHONY: deploy
-deploy: ## Deploy completo do cluster (all playbooks)
-	$(ANSIBLE) site.yml
+deploy: $(VARS_FILE) ## Deploy completo do cluster (all playbooks)
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml
 
 .PHONY: deploy-check
-deploy-check: ## Dry-run do deploy completo
-	$(ANSIBLE) site.yml --check --diff
+deploy-check: $(VARS_FILE) ## Dry-run do deploy completo
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --check --diff
 
 # =============================================================================
 # Deploy por componente
 # =============================================================================
 .PHONY: deploy-common
-deploy-common: ## Setup base em todas as VMs
-	$(ANSIBLE) site.yml --tags common
+deploy-common: $(VARS_FILE) ## Setup base em todas as VMs
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags common
 
 .PHONY: deploy-docker
-deploy-docker: ## Instala Docker em todos os nós
-	$(ANSIBLE) site.yml --tags docker
+deploy-docker: $(VARS_FILE) ## Instala Docker em todos os nós
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags docker
 
 .PHONY: deploy-db
-deploy-db: ## Provisiona PostgreSQL + PostGIS
-	$(ANSIBLE) site.yml --tags database
+deploy-db: $(VARS_FILE) ## Provisiona PostgreSQL + PostGIS
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags database
 
 .PHONY: deploy-nfs
-deploy-nfs: ## Configura NFS server (write) e clientes (reads)
-	$(ANSIBLE) site.yml --tags nfs
+deploy-nfs: $(VARS_FILE) ## Configura NFS server (write) e clientes (reads)
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags nfs
 
 .PHONY: deploy-geoserver
-deploy-geoserver: ## Deploy de todos os nós GeoServer
-	$(ANSIBLE) site.yml --tags geoserver
+deploy-geoserver: $(VARS_FILE) ## Deploy de todos os nós GeoServer
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags geoserver
 
 .PHONY: deploy-geoserver-write
-deploy-geoserver-write: ## Deploy apenas do nó write
-	$(ANSIBLE) site.yml --tags geoserver_write
+deploy-geoserver-write: $(VARS_FILE) ## Deploy apenas do nó write
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags geoserver_write
 
 .PHONY: deploy-geoserver-read
-deploy-geoserver-read: ## Deploy dos workers de leitura
-	$(ANSIBLE) site.yml --tags geoserver_read
+deploy-geoserver-read: $(VARS_FILE) ## Deploy dos workers de leitura
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags geoserver_read
 
 .PHONY: deploy-geonode
-deploy-geonode: ## Deploy da aplicação GeoNode
-	$(ANSIBLE) site.yml --tags geonode
+deploy-geonode: $(VARS_FILE) ## Deploy da aplicação GeoNode
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags geonode
 
 .PHONY: deploy-haproxy
-deploy-haproxy: ## Deploy do HAProxy
-	$(ANSIBLE) site.yml --tags haproxy
+deploy-haproxy: $(VARS_FILE) ## Deploy do HAProxy
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags haproxy
 
 .PHONY: deploy-keepalived
-deploy-keepalived: ## Deploy do Keepalived (VIP)
-	$(ANSIBLE) site.yml --tags keepalived
+deploy-keepalived: $(VARS_FILE) ## Deploy do Keepalived (VIP)
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags keepalived
 
 # =============================================================================
 # Reconfiguração (sem reinstalar serviços)
 # =============================================================================
 .PHONY: reconfigure
-reconfigure: ## Reaplica apenas arquivos de configuração
-	$(ANSIBLE) site.yml --tags config
+reconfigure: $(VARS_FILE) ## Reaplica apenas arquivos de configuração
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags config
 
 .PHONY: reconfigure-haproxy
-reconfigure-haproxy: ## Reaplica config do HAProxy
-	$(ANSIBLE) site.yml --tags haproxy,config
+reconfigure-haproxy: $(VARS_FILE) ## Reaplica config do HAProxy
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags haproxy,config
 
 .PHONY: reconfigure-geoserver
-reconfigure-geoserver: ## Reaplica config de todos os GeoServers
-	$(ANSIBLE) site.yml --tags geoserver,config
+reconfigure-geoserver: $(VARS_FILE) ## Reaplica config de todos os GeoServers
+	$(ANSIBLE) $(CURDIR)/ansible/site.yml --tags geoserver,config
 
 # =============================================================================
 # Operações em produção
 # =============================================================================
 .PHONY: ping
-ping: ## Testa conectividade Ansible com todos os hosts
-	cd ansible && ansible -i ../$(INVENTORY) all -m ping
+ping: $(VARS_FILE) ## Testa conectividade Ansible com todos os hosts
+	ansible -i $(INVENTORY) $(ANSIBLE_EXTRA) all -m ping
 
 .PHONY: facts
-facts: ## Coleta facts de todos os hosts
-	cd ansible && ansible -i ../$(INVENTORY) all -m gather_facts --tree /tmp/ansible-facts
+facts: $(VARS_FILE) ## Coleta facts de todos os hosts
+	ansible -i $(INVENTORY) $(ANSIBLE_EXTRA) all -m gather_facts --tree /tmp/ansible-facts
 
 .PHONY: check-haproxy
 check-haproxy: ## Verifica saúde do HAProxy via stats API
@@ -186,18 +192,18 @@ check-vip: ## Verifica se o VIP Keepalived está respondendo
 # Logs
 # =============================================================================
 .PHONY: logs-geonode
-logs-geonode: ## Exibe logs do GeoNode (tail -f)
-	cd ansible && ansible -i ../$(INVENTORY) geonode -m command \
+logs-geonode: $(VARS_FILE) ## Exibe logs do GeoNode (tail -f)
+	ansible -i $(INVENTORY) $(ANSIBLE_EXTRA) geonode -m command \
 	  -a "docker compose -f /opt/geonode/docker-compose.yml logs -f --tail=100"
 
 .PHONY: logs-geoserver-write
-logs-geoserver-write: ## Exibe logs do GeoServer Write
-	cd ansible && ansible -i ../$(INVENTORY) geoserver_write -m command \
+logs-geoserver-write: $(VARS_FILE) ## Exibe logs do GeoServer Write
+	ansible -i $(INVENTORY) $(ANSIBLE_EXTRA) geoserver_write -m command \
 	  -a "docker compose -f /opt/geoserver/docker-compose.yml logs -f --tail=100"
 
 .PHONY: logs-haproxy
-logs-haproxy: ## Exibe logs do HAProxy
-	cd ansible && ansible -i ../$(INVENTORY) haproxy -m command \
+logs-haproxy: $(VARS_FILE) ## Exibe logs do HAProxy
+	ansible -i $(INVENTORY) $(ANSIBLE_EXTRA) haproxy -m command \
 	  -a "journalctl -u haproxy -f --lines=50"
 
 # =============================================================================
@@ -205,15 +211,15 @@ logs-haproxy: ## Exibe logs do HAProxy
 # =============================================================================
 .PHONY: lint
 lint: ## Valida playbooks Ansible (ansible-lint)
-	cd ansible && ansible-lint site.yml || true
+	ansible-lint $(CURDIR)/ansible/site.yml || true
 
 .PHONY: graph
-graph: ## Gera grafo de dependências do playbook
-	cd ansible && ansible-playbook -i ../$(INVENTORY) site.yml --list-tasks
+graph: $(VARS_FILE) ## Gera grafo de dependências do playbook
+	ansible-playbook -i $(INVENTORY) $(CURDIR)/ansible/site.yml --list-tasks
 
 .PHONY: inventory
 inventory: ## Exibe inventário atual formatado
-	cd ansible && ansible-inventory -i ../$(INVENTORY) --graph
+	ansible-inventory -i $(INVENTORY) --graph
 
 .PHONY: clean
 clean: ## Remove arquivos temporários e caches
