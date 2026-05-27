@@ -29,8 +29,68 @@ def env(key, default = nil)
   ENV.fetch(key, default)
 end
 
+# Detecta o proxy HTTP do host (Windows, Linux ou macOS).
+# Ordem de prioridade:
+#   1. Variável de ambiente já exportada no shell (HTTP_PROXY / http_proxy)
+#   2. WinHTTP (netsh) — proxy de máquina, configurado via GPO ou netsh
+#   3. WinInet/IE (HKCU registry) — proxy do usuário no Windows
+#   4. macOS: scutil --proxy
+#   5. Linux: /etc/environment
+def detect_host_proxy
+  # 1. Env var já presente (set pelo shell ou por ferramenta corporativa)
+  val = [ENV['HTTP_PROXY'], ENV['http_proxy']].find { |v| v && !v.strip.empty? }
+  return val.strip if val
+
+  begin
+    if ENV['OS'] =~ /Windows/i || RUBY_PLATFORM =~ /mingw|mswin/i
+      # 2. WinHTTP — proxy de máquina (netsh winhttp show proxy)
+      raw = `netsh winhttp show proxy 2>nul`
+      if raw =~ /Proxy Server\(s\)\s*[=:]\s*(\S+)/i
+        addr = $1.strip
+        unless addr =~ /\ADirect\z/i
+          addr = addr.split(';').first.sub(/\Ahttps?=/, '')
+          addr = "http://#{addr}" unless addr =~ /\Ahttps?:\/\//
+          return addr
+        end
+      end
+      # 3. WinInet — proxy do usuário atual (HKCU)
+      enabled = `reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" /v ProxyEnable 2>nul`
+      if enabled =~ /0x1/
+        server = `reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" /v ProxyServer 2>nul`
+        if server =~ /ProxyServer\s+REG_SZ\s+(\S+)/i
+          addr = $1.strip.split(';').first.sub(/\Ahttps?=/, '')
+          addr = "http://#{addr}" unless addr =~ /\Ahttps?:\/\//
+          return addr
+        end
+      end
+    elsif RUBY_PLATFORM =~ /darwin/i
+      # 4. macOS — scutil --proxy
+      raw = `scutil --proxy 2>/dev/null`
+      if raw =~ /HTTPEnable\s*:\s*1/ && raw =~ /HTTPProxy\s*:\s*(\S+)/
+        host = $1
+        port = raw =~ /HTTPPort\s*:\s*(\d+)/ ? $1 : '80'
+        return "http://#{host}:#{port}"
+      end
+    else
+      # 5. Linux — /etc/environment
+      if File.exist?('/etc/environment')
+        File.readlines('/etc/environment').each do |line|
+          if line =~ /\Ahttp_proxy=["']?(.+?)["']?\s*\z/i
+            v = $1.strip
+            return v unless v.empty?
+          end
+        end
+      end
+    end
+  rescue StandardError
+    # ignora erros de detecção
+  end
+
+  '' # sem proxy detectado
+end
+
 BOX        = env('VAGRANT_BOX',            'ubuntu/jammy64')
-HTTP_PROXY  = env('HTTP_PROXY',  '')
+HTTP_PROXY  = detect_host_proxy
 HTTPS_PROXY = env('HTTPS_PROXY', HTTP_PROXY)
 NO_PROXY    = env('NO_PROXY',    'localhost,127.0.0.1,192.168.56.0/24,10.0.0.0/8')
 NET_PREFIX = env('VAGRANT_NETWORK_PREFIX', '192.168.56')

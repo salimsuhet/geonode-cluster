@@ -18,6 +18,16 @@ ifneq (,$(wildcard $(ENV_FILE)))
 endif
 DEPLOY_MODE ?= vagrant
 
+# Exporta variáveis de proxy do .env para o ambiente do shell.
+# Necessário para que o lookup('env', ...) do Ansible as encontre
+# ao rodar os playbooks (grupo static ou vagrant via make).
+# Usamos export seletivo — não um 'include' geral — para evitar que
+# Make interprete ${VAR} em valores de outras linhas do .env.
+ifneq (,$(wildcard $(ENV_FILE)))
+  include $(ENV_FILE)
+  export HTTP_PROXY HTTPS_PROXY NO_PROXY
+endif
+
 ifeq ($(DEPLOY_MODE),vagrant)
   INVENTORY := $(VAGRANT_INV)
 else
