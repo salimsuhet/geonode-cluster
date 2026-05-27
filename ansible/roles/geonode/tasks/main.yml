@@ -82,13 +82,15 @@
   changed_when: "'No migrations to apply' not in migrate_result.stdout"
   tags: [geonode, migrate]
 
-- name: Cria superusuário GeoNode
+- name: Cria ou atualiza superusuário GeoNode
+  # Usa get_or_create + set_password para garantir que a senha é
+  # sempre sincronizada com envs/.env, mesmo em re-deploys.
+  # Comando em linha única para evitar IndentationError no Python -c.
   community.docker.docker_container_exec:
     container: geonode_django
-    command: >-
-      python manage.py shell -c
-      "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='{{ geonode_admin_user }}').exists() or User.objects.create_superuser('{{ geonode_admin_user }}', '{{ geonode_admin_email }}', '{{ geonode_admin_password }}')"
-  changed_when: false
+    command: "python manage.py shell -c \"from django.contrib.auth import get_user_model; User = get_user_model(); u, created = User.objects.get_or_create(username='{{ geonode_admin_user }}'); u.set_password('{{ geonode_admin_password }}'); u.email = '{{ geonode_admin_email }}'; u.is_superuser = True; u.is_staff = True; u.save(); print('created' if created else 'updated')\""
+  register: admin_user_result
+  changed_when: "'created' in admin_user_result.stdout"
   tags: [geonode, users]
 
 - name: Coleta arquivos estáticos
