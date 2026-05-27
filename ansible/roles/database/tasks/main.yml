@@ -33,6 +33,7 @@
     dest: /etc/apt/keyrings/postgresql.asc
     mode: '0644'
     force: false
+  environment: "{{ proxy_env }}"
   tags: [database]
 
 - name: Adiciona repositório PostgreSQL

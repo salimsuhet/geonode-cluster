@@ -37,6 +37,7 @@
     - "{{ geoserver_data_dir }}"
     - "{{ geoserver_data_dir }}/logs"
     - "{{ geoserver_data_dir }}/gwc"
+    - "{{ geoserver_data_dir }}/plugins"
     - "{{ geoserver_data_dir }}/security/filter/geonode-oauth2"
     - /opt/geoserver/config
   tags: [geoserver]

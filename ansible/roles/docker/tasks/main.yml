@@ -25,6 +25,7 @@
     dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
     force: false
+  environment: "{{ proxy_env }}"
   tags: [docker]
 
 - name: Adiciona repositório Docker

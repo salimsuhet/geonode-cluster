@@ -36,6 +36,19 @@ ip_haproxy_2:        "{{ lookup('env', 'IP_HAPROXY_2')        | default('192.168
 # -----------------------------------------------------------------------------
 http_proxy:  "{{ lookup('env', 'HTTP_PROXY')  | default('', true) }}"
 https_proxy: "{{ lookup('env', 'HTTPS_PROXY') | default(http_proxy, true) }}"
+
+# Dict de proxy para injetar via environment: nos tasks get_url / uri externos.
+# Usado porque o Ansible executa via SSH não-interativo e nunca carrega
+# /etc/profile.d/proxy.sh — portanto o urllib Python não vê o proxy sem isso.
+# Fica vazio ({}) quando http_proxy não está definido (sem overhead).
+proxy_env: >-
+  {{ {'http_proxy':  http_proxy,
+      'https_proxy': https_proxy,
+      'HTTP_PROXY':  http_proxy,
+      'HTTPS_PROXY': https_proxy,
+      'no_proxy':    no_proxy,
+      'NO_PROXY':    no_proxy}
+     if http_proxy | default('') | length > 0 else {} }}
 no_proxy:    "{{ lookup('env', 'NO_PROXY')    | default('localhost,127.0.0.1,' ~ ip_db ~ ',' ~ ip_geonode ~ ',' ~ ip_geoserver_write ~ ',' ~ ip_geoserver_read_1 ~ ',' ~ ip_geoserver_read_2 ~ ',' ~ ip_haproxy_1 ~ ',' ~ ip_haproxy_2 ~ ',' ~ haproxy_vip, true) }}"
 
 # -----------------------------------------------------------------------------

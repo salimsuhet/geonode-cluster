@@ -55,6 +55,7 @@
     owner: geoserver
     mode: '0644'
     timeout: 120
+  environment: "{{ proxy_env }}"
   register: dl_jms
   retries: 3
   delay: 10
@@ -84,6 +85,7 @@
     owner: geoserver
     mode: '0644'
     timeout: 120
+  environment: "{{ proxy_env }}"
   register: dl_geofence
   retries: 3
   delay: 10
@@ -106,6 +108,7 @@
     owner: geoserver
     mode: '0644'
     timeout: 120
+  environment: "{{ proxy_env }}"
   register: dl_control_flow
   retries: 3
   delay: 10
@@ -128,6 +131,7 @@
     owner: geoserver
     mode: '0644'
     timeout: 120
+  environment: "{{ proxy_env }}"
   register: dl_monitor
   retries: 3
   delay: 10
@@ -150,6 +154,7 @@
     owner: geoserver
     mode: '0644'
     timeout: 120
+  environment: "{{ proxy_env }}"
   register: dl_gdal
   retries: 3
   delay: 10
