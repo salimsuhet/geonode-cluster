@@ -14,9 +14,10 @@
   file:
     path: "{{ nfs_export_path }}"
     state: directory
-    owner: geoserver
-    group: geoserver
     mode: '0755'
+    # Sem owner/group: o diretório é um ponto de montagem NFS.
+    # chown falha com EROFS quando o path já está montado (NFS read-only flags).
+    # A ownership dentro do mount é controlada pelo servidor NFS.
   tags: [nfs, nfs_client]
 
 - name: Aguarda NFS server estar disponível
