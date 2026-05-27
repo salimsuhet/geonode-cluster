@@ -25,7 +25,18 @@ DEPLOY_MODE ?= vagrant
 # Make interprete ${VAR} em valores de outras linhas do .env.
 ifneq (,$(wildcard $(ENV_FILE)))
   include $(ENV_FILE)
-  export HTTP_PROXY HTTPS_PROXY NO_PROXY
+  # Exporta todas as variáveis do .env para o ambiente do shell.
+  # Necessário para que lookup('env', ...) do Ansible as encontre.
+  # As variáveis com ${VAR} no valor (ex: GEOSERVER_CLUSTER_BROKER_URL)
+  # são expandidas corretamente pelo Make pois IP_* estão definidos antes.
+  export HTTP_PROXY HTTPS_PROXY NO_PROXY \
+         GEONODE_ADMIN_USER GEONODE_ADMIN_PASSWORD GEONODE_ADMIN_EMAIL \
+         GEOSERVER_ADMIN_USER GEOSERVER_ADMIN_PASSWORD GEOSERVER_FACTORY_PASSWORD \
+         POSTGRES_USER POSTGRES_PASSWORD \
+         GEONODE_SECRET_KEY \
+         OAUTH2_CLIENT_ID OAUTH2_CLIENT_SECRET \
+         KEEPALIVED_VRRP_PASSWORD \
+         HAPROXY_STATS_USER HAPROXY_STATS_PASSWORD
 endif
 
 ifeq ($(DEPLOY_MODE),vagrant)

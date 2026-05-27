@@ -54,8 +54,8 @@ no_proxy:    "{{ lookup('env', 'NO_PROXY')    | default('localhost,127.0.0.1,' ~
 # -----------------------------------------------------------------------------
 # BANCO DE DADOS
 # -----------------------------------------------------------------------------
-postgres_user:               "{{ lookup('env', 'POSTGRES_USER')               | default('geonode',   true) }}"
-postgres_password:           "{{ lookup('env', 'POSTGRES_PASSWORD')           | default('changeme',  true) }}"
+postgres_user:               "{{ POSTGRES_USER               | default(lookup('env', 'POSTGRES_USER')               | default('geonode',   true), true) }}"
+postgres_password:           "{{ POSTGRES_PASSWORD           | default(lookup('env', 'POSTGRES_PASSWORD')           | default('changeme',  true), true) }}"
 postgres_db:                 "{{ lookup('env', 'POSTGRES_DB')                 | default('geonode',   true) }}"
 postgres_data_db:            "{{ lookup('env', 'POSTGRES_DATA_DB')            | default('geonode_data', true) }}"
 postgres_port:               "{{ lookup('env', 'POSTGRES_PORT')               | default('5432',      true) }}"
@@ -67,10 +67,10 @@ postgres_work_mem:           "{{ lookup('env', 'POSTGRES_WORK_MEM')           | 
 # -----------------------------------------------------------------------------
 # GEONODE
 # -----------------------------------------------------------------------------
-geonode_secret_key:      "{{ lookup('env', 'GEONODE_SECRET_KEY')      | default('CHANGEME_secret',   true) }}"
-geonode_admin_user:      "{{ lookup('env', 'GEONODE_ADMIN_USER')      | default('admin',             true) }}"
-geonode_admin_password:  "{{ lookup('env', 'GEONODE_ADMIN_PASSWORD')  | default('admin',             true) }}"
-geonode_admin_email:     "{{ lookup('env', 'GEONODE_ADMIN_EMAIL')     | default('admin@example.com', true) }}"
+geonode_secret_key:      "{{ GEONODE_SECRET_KEY      | default(lookup('env', 'GEONODE_SECRET_KEY')      | default('CHANGEME_secret',   true), true) }}"
+geonode_admin_user:      "{{ GEONODE_ADMIN_USER      | default(lookup('env', 'GEONODE_ADMIN_USER')      | default('admin',             true), true) }}"
+geonode_admin_password:  "{{ GEONODE_ADMIN_PASSWORD  | default(lookup('env', 'GEONODE_ADMIN_PASSWORD')  | default('admin',             true), true) }}"
+geonode_admin_email:     "{{ GEONODE_ADMIN_EMAIL     | default(lookup('env', 'GEONODE_ADMIN_EMAIL')     | default('admin@example.com', true), true) }}"
 django_debug:            "{{ lookup('env', 'DEBUG')                   | default('False',             true) }}"
 django_allowed_hosts:    "{{ lookup('env', 'DJANGO_ALLOWED_HOSTS')    | default('*',                 true) }}"
 django_time_zone:        "{{ lookup('env', 'TIME_ZONE')               | default('America/Sao_Paulo', true) }}"
@@ -84,14 +84,14 @@ geonode_public_hostname: "{{ lookup('env', 'GEONODE_PUBLIC_HOSTNAME') | default(
 
 # OAuth2 — gerado na primeira execução e armazenado no .env
 # Necessário para autenticação do MapStore e integração GeoServer
-oauth2_client_id:     "{{ lookup('env', 'OAUTH2_CLIENT_ID')     | default('', true) }}"
-oauth2_client_secret: "{{ lookup('env', 'OAUTH2_CLIENT_SECRET') | default('', true) }}"
+oauth2_client_id:     "{{ OAUTH2_CLIENT_ID     | default(lookup('env', 'OAUTH2_CLIENT_ID')     | default('', true), true) }}"
+oauth2_client_secret: "{{ OAUTH2_CLIENT_SECRET | default(lookup('env', 'OAUTH2_CLIENT_SECRET') | default('', true), true) }}"
 
 # -----------------------------------------------------------------------------
 # GEOSERVER
 # -----------------------------------------------------------------------------
-geoserver_admin_user:     "{{ lookup('env', 'GEOSERVER_ADMIN_USER')     | default('admin',    true) }}"
-geoserver_admin_password: "{{ lookup('env', 'GEOSERVER_ADMIN_PASSWORD') | default('geoserver', true) }}"
+geoserver_admin_user:     "{{ GEOSERVER_ADMIN_USER     | default(lookup('env', 'GEOSERVER_ADMIN_USER')     | default('admin',    true), true) }}"
+geoserver_admin_password: "{{ GEOSERVER_ADMIN_PASSWORD | default(lookup('env', 'GEOSERVER_ADMIN_PASSWORD') | default('geoserver', true), true) }}"
 geoserver_port:           "{{ lookup('env', 'GEOSERVER_PORT')           | default('8080',     true) }}"
 geoserver_data_dir:       "{{ lookup('env', 'GEOSERVER_DATA_DIR')       | default('/opt/geoserver_data', true) }}"
 geoserver_java_opts:      "{{ lookup('env', 'GEOSERVER_JAVA_OPTS')      | default('-Xms2g -Xmx4g -XX:+UseG1GC', true) }}"
@@ -123,7 +123,7 @@ geofence_backend: "{{ lookup('env', 'GEOFENCE_BACKEND') | default('postgres', tr
 # -----------------------------------------------------------------------------
 haproxy_stats_port:      "{{ lookup('env', 'HAPROXY_STATS_PORT')      | default('8404',    true) }}"
 haproxy_stats_user:      "{{ lookup('env', 'HAPROXY_STATS_USER')      | default('admin',   true) }}"
-haproxy_stats_password:  "{{ lookup('env', 'HAPROXY_STATS_PASSWORD')  | default('changeme', true) }}"
+haproxy_stats_password:  "{{ HAPROXY_STATS_PASSWORD  | default(lookup('env', 'HAPROXY_STATS_PASSWORD')  | default('changeme', true), true) }}"
 haproxy_http_port:       "{{ lookup('env', 'HAPROXY_HTTP_PORT')       | default('80',      true) }}"
 haproxy_https_port:      "{{ lookup('env', 'HAPROXY_HTTPS_PORT')      | default('443',     true) }}"
 haproxy_connect_timeout: "{{ lookup('env', 'HAPROXY_CONNECT_TIMEOUT') | default('10s',     true) }}"
@@ -134,5 +134,5 @@ haproxy_server_timeout:  "{{ lookup('env', 'HAPROXY_SERVER_TIMEOUT')  | default(
 # KEEPALIVED
 # -----------------------------------------------------------------------------
 keepalived_vrrp_id:       "{{ lookup('env', 'KEEPALIVED_VRRP_ID')       | default('51',       true) }}"
-keepalived_vrrp_password: "{{ lookup('env', 'KEEPALIVED_VRRP_PASSWORD') | default('changeme', true) }}"
+keepalived_vrrp_password: "{{ KEEPALIVED_VRRP_PASSWORD | default(lookup('env', 'KEEPALIVED_VRRP_PASSWORD') | default('changeme', true), true) }}"
 keepalived_interface:     "{{ lookup('env', 'KEEPALIVED_INTERFACE')      | default('eth1',      true) }}"
