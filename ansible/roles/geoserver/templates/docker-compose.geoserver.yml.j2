@@ -54,6 +54,7 @@ services:
       # Workers: usam IP privado do master + porta externa 61666.
       CATALINA_OPTS: >-
         -DGEOSERVER_CSRF_DISABLED=true
+        -DALLOW_ENV_PARAMETRIZATION=false
 {% if geoserver_is_master | bool %}
         -Dorg.geoserver.cluster.jms.broker=tcp://activemq:61616
 {% else %}

@@ -81,7 +81,7 @@
       -c "cp -rn /usr/local/tomcat/webapps/geoserver/data/. /target/"
     chown -R geoserver:geoserver {{ geoserver_data_dir }}
   args:
-    creates: "{{ geoserver_data_dir }}/global.xml"
+    creates: "{{ geoserver_data_dir }}/styles/default_point.sld"
   tags: [geoserver]
 
 # ------------------------------------------------------------------
@@ -183,11 +183,82 @@
 # /geoserver/j_spring_oauth2_geonode_login antes de encaminhar ao GeoServer,
 # que é o path que o Spring Security realmente escuta.
 # ------------------------------------------------------------------
+
+# O security/config.xml NÃO existe no data dir embutido na imagem
+# geonode/geoserver — ele é gerado pelo GeoServer na primeira inicialização.
+# O pré-populate via `cp -rn` não o produz.
+#
+# PROBLEMA CONHECIDO: a tarefa de extração usa redirecionamento shell (`>`).
+# Se o arquivo não existir na imagem, o `docker run` retorna código de saída
+# não-zero mas o shell já criou o arquivo de destino com 0 bytes antes de
+# receber o erro. Um XML vazio causa XStreamException/EOFException no
+# GeoServerSecurityManager, que o Spring propaga como
+# BeanCurrentlyInCreationException ("circular reference") — erro enganoso.
+#
+# Solução:
+#   1. Remover o arquivo se estiver vazio.
+#   2. Tentar extrair da imagem apenas se o arquivo não existir; usar
+#      variável de shell para evitar criar arquivo vazio em caso de falha.
+#   3. Executar configure_security_xml.py somente se o arquivo existir
+#      e tiver conteúdo (se não existir, o GeoServer o gera no 1.º boot;
+#      o script será executado no próximo run do playbook).
+- name: Verifica se security/config.xml existe (gerado pelo pré-populate)
+  stat:
+    path: "{{ geoserver_data_dir }}/security/config.xml"
+  register: security_config_xml_stat
+  when: geoserver_is_master | bool
+  tags: [geoserver, oauth2]
+
+- name: Remove security/config.xml vazio (docker run falhou — arquivo não existe na imagem)
+  # Um arquivo vazio causa XStreamException no GeoServerSecurityManager,
+  # que o Spring propaga como BeanCurrentlyInCreationException.
+  # Ao remover, o GeoServer gera o arquivo correto na primeira inicialização.
+  file:
+    path: "{{ geoserver_data_dir }}/security/config.xml"
+    state: absent
+  when:
+    - geoserver_is_master | bool
+    - security_config_xml_stat.stat.exists | default(false)
+    - security_config_xml_stat.stat.size | default(1) == 0
+  tags: [geoserver, oauth2]
+
+- name: Extrai security/config.xml da imagem (ausente após pré-populate)
+  # Usa variável de shell para capturar o conteúdo antes de escrever no disco.
+  # Se o arquivo não existir na imagem (conteúdo vazio), não cria arquivo vazio.
+  shell: |
+    CONTENT=$(docker run --rm --entrypoint sh {{ geoserver_image }} \
+      -c 'cat /usr/local/tomcat/webapps/geoserver/data/security/config.xml 2>/dev/null' \
+      2>/dev/null || true)
+    if [ -n "$CONTENT" ]; then
+      printf '%s\n' "$CONTENT" > "{{ geoserver_data_dir }}/security/config.xml"
+      chown geoserver:geoserver "{{ geoserver_data_dir }}/security/config.xml"
+    fi
+    # Se CONTENT estiver vazio: arquivo não existe na imagem.
+    # O GeoServer irá gerá-lo na primeira inicialização — não cria arquivo vazio.
+  when:
+    - geoserver_is_master | bool
+    - not (security_config_xml_stat.stat.exists | default(false))
+      or (security_config_xml_stat.stat.size | default(1) == 0)
+  tags: [geoserver, oauth2]
+
+- name: Re-verifica security/config.xml após tentativa de extração
+  stat:
+    path: "{{ geoserver_data_dir }}/security/config.xml"
+  register: security_config_xml_stat_post
+  when: geoserver_is_master | bool
+  tags: [geoserver, oauth2]
+
 - name: Configura security/config.xml para OAuth2 (webLogin chain)
+  # Executa somente se o arquivo existir e tiver conteúdo.
+  # Se ainda não existir (arquivo não está na imagem), o GeoServer o gera
+  # no primeiro boot; este script será aplicado no próximo run do playbook.
   script: configure_security_xml.py {{ geoserver_data_dir }}/security/config.xml
   args:
     executable: python3
-  when: geoserver_is_master | bool
+  when:
+    - geoserver_is_master | bool
+    - security_config_xml_stat_post.stat.exists | default(false)
+    - security_config_xml_stat_post.stat.size | default(0) > 0
   register: security_xml_result
   changed_when: "'changed' in security_xml_result.stdout"
   notify: Restart GeoServer
@@ -199,10 +270,27 @@
 # com espaço no nome, deixando o arquivo vazio. O XStream do GeoServer
 # lança EOFException ao tentar carregar um arquivo vazio.
 # ------------------------------------------------------------------
+- name: Garante que o diretório 'geonode REST role service' existe
+  file:
+    path: "{{ geoserver_data_dir }}/security/role/geonode REST role service"
+    state: directory
+    owner: geoserver
+    group: geoserver
+    mode: '0755'
+  when: geoserver_is_master | bool
+  tags: [geoserver, oauth2]
+
+- name: Verifica estado do geonode REST role service/config.xml
+  stat:
+    path: "{{ geoserver_data_dir }}/security/role/geonode REST role service/config.xml"
+  register: role_service_config_stat
+  when: geoserver_is_master | bool
+  tags: [geoserver, oauth2]
+
 - name: Restaura geonode REST role service/config.xml da imagem
-  # Usa stat + tamanho para detectar arquivo vazio (criado pelo cp -rn com
-  # espaço no nome do diretório). creates: não é suficiente porque o arquivo
-  # pode existir mas estar vazio, causando EOFException no XStream.
+  # Roda se o arquivo não existe ou está vazio (cp -rn falha silenciosamente
+  # em diretórios com espaço no nome, deixando o arquivo vazio).
+  # Um arquivo vazio causa EOFException no XStream do GeoServer.
   shell: |
     docker run --rm --entrypoint sh {{ geoserver_image }} \
       -c 'cat "/usr/local/tomcat/webapps/geoserver/data/security/role/geonode REST role service/config.xml"' \
@@ -212,8 +300,7 @@
   changed_when: true
   when:
     - geoserver_is_master | bool
-    - lookup('fileglob', geoserver_data_dir ~ '/security/role/geonode REST role service/config.xml') | length == 0
-      or (lookup('file', geoserver_data_dir ~ '/security/role/geonode REST role service/config.xml', errors='ignore') | default('') | length == 0)
+    - not role_service_config_stat.stat.exists or role_service_config_stat.stat.size == 0
   notify: Restart GeoServer
   tags: [geoserver, oauth2]
 
@@ -223,12 +310,55 @@
 # do VIP e a CSP (form-action 'self') bloqueia o login OAuth2.
 # Usa replace (regex) para evitar dependência de lxml no host remoto.
 # ------------------------------------------------------------------
+- name: Verifica se global.xml existe (gerado pelo pré-populate)
+  stat:
+    path: "{{ geoserver_data_dir }}/global.xml"
+  register: global_xml_stat
+  when: geoserver_is_master | bool
+  tags: [geoserver, oauth2]
+
+- name: Remove global.xml vazio (mesmo problema do security/config.xml — não existe na imagem)
+  file:
+    path: "{{ geoserver_data_dir }}/global.xml"
+    state: absent
+  when:
+    - geoserver_is_master | bool
+    - global_xml_stat.stat.exists | default(false)
+    - global_xml_stat.stat.size | default(1) == 0
+  tags: [geoserver, oauth2]
+
+- name: Extrai global.xml da imagem (ausente após pré-populate)
+  shell: |
+    CONTENT=$(docker run --rm --entrypoint sh {{ geoserver_image }} \
+      -c 'cat /usr/local/tomcat/webapps/geoserver/data/global.xml 2>/dev/null' \
+      2>/dev/null || true)
+    if [ -n "$CONTENT" ]; then
+      printf '%s\n' "$CONTENT" > "{{ geoserver_data_dir }}/global.xml"
+      chown geoserver:geoserver "{{ geoserver_data_dir }}/global.xml"
+    fi
+    # Se vazio: não existe na imagem; GeoServer o gera na primeira inicialização.
+  when:
+    - geoserver_is_master | bool
+    - not (global_xml_stat.stat.exists | default(false))
+      or (global_xml_stat.stat.size | default(1) == 0)
+  tags: [geoserver, oauth2]
+
+- name: Re-verifica global.xml após tentativa de extração
+  stat:
+    path: "{{ geoserver_data_dir }}/global.xml"
+  register: global_xml_stat_post
+  when: geoserver_is_master | bool
+  tags: [geoserver, oauth2]
+
 - name: Corrige proxyBaseUrl no global.xml do GeoServer
   replace:
     path: "{{ geoserver_data_dir }}/global.xml"
     regexp: '<proxyBaseUrl>.*</proxyBaseUrl>'
     replace: '<proxyBaseUrl>http://{{ geonode_public_hostname }}/geoserver</proxyBaseUrl>'
-  when: geoserver_is_master | bool
+  when:
+    - geoserver_is_master | bool
+    - global_xml_stat_post.stat.exists | default(false)
+    - global_xml_stat_post.stat.size | default(0) > 0
   notify: Restart GeoServer
   tags: [geoserver, oauth2]
 

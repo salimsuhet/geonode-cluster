@@ -101,7 +101,43 @@
     - "'geofence-server' in plugin_list"
     - dl_geofence is not failed
 
-- name: Baixa plugin control-flow (extensão oficial)
+# ------------------------------------------------------------------
+# geofence-datasource-ovr.properties — aponta o Geofence para o banco
+# correto. Sem este arquivo, o Geofence usa o H2 embutido independente
+# de qual plugin foi instalado, causando ClassNotFoundException: org.h2.Driver
+# quando o plugin postgres está no classpath sem o JAR H2.
+# ------------------------------------------------------------------
+- name: Cria diretório geofence no data dir
+  file:
+    path: "{{ geoserver_data_dir }}/geofence"
+    state: directory
+    owner: geoserver
+    group: geoserver
+    mode: '0755'
+  when:
+    - "'geofence-server' in plugin_list"
+    - geofence_backend == 'postgres'
+
+- name: Gera geofence-datasource-ovr.properties (backend postgres)
+  copy:
+    dest: "{{ geoserver_data_dir }}/geofence/geofence-datasource-ovr.properties"
+    owner: geoserver
+    group: geoserver
+    mode: '0640'
+    content: |
+      # Geofence datasource — gerado pelo Ansible
+      geofenceVendorAdapter.databasePlatform=org.hibernate.spatial.dialect.postgis.PostgisPG10Dialect
+      geofenceDataSource.driverClassName=org.postgresql.Driver
+      geofenceDataSource.url=jdbc:postgresql://{{ ip_db }}:{{ postgres_port }}/{{ postgres_db }}
+      geofenceDataSource.username={{ postgres_user }}
+      geofenceDataSource.password={{ postgres_password }}
+      geofenceEntityManagerFactory.jpaPropertyMap[hibernate.default_schema]=public
+  when:
+    - "'geofence-server' in plugin_list"
+    - geofence_backend == 'postgres'
+  notify: Restart GeoServer
+
+- name: Download plugin control-flow
   get_url:
     url: "{{ gs_ext_base_url }}/geoserver-{{ geoserver_version }}-control-flow-plugin.zip"
     dest: "/opt/geoserver/plugins/control-flow.zip"
