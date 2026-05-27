@@ -36,9 +36,14 @@
   roles:
     - nfs_server
 
-# 5. NFS — Clientes (workers montam o data dir do master)
+# 5. NFS — Clientes (workers e GeoNode montam o data dir do master)
+#
+# O GeoNode tambem precisa do mount NFS: o docker-compose.geonode.yml.j2
+# usa /opt/geoserver_data como volume local para compartilhar arquivos
+# enviados entre Django e GeoServer (uploads, rasters, etc.).
+# Sem o mount, o docker compose up falha com "no such file or directory".
 - name: NFS Client — Monta data dir compartilhado
-  hosts: geoserver_read
+  hosts: geoserver_read, geonode
   become: true
   tags: [nfs, nfs_client]
   roles:
