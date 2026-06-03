@@ -82,6 +82,98 @@
   changed_when: "'No migrations to apply' not in migrate_result.stdout"
   tags: [geonode, migrate]
 
+# ------------------------------------------------------------------
+# Garante as tabelas do django-dynamic-models nos dois bancos PostgreSQL.
+#
+# Contexto: o app django-dynamic-models registra suas migrations
+# normalmente, mas em alguns cenários de deploy o syncdb não cria
+# as tabelas físicas. Sem elas o Celery lança ProgrammingError ao
+# processar qualquer upload de camada vetorial.
+#
+# O GeoNode usa dois bancos:
+#   - geonode       → banco principal (Django ORM padrão)
+#   - geonode_data  → banco de dados geoespaciais (roteador "datastore")
+#
+# O dynamic_models pode ser roteado para qualquer um dependendo do
+# contexto de execução do Celery, por isso criamos em ambos.
+#
+# As tabelas são criadas com IF NOT EXISTS (idempotente).
+# As permissões são concedidas ao usuário da aplicação (postgres_user).
+# ------------------------------------------------------------------
+- name: Garante tabelas dynamic_models no banco principal (geonode)
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: >-
+      python manage.py shell -c
+      "from django.db import connections;
+      conn = connections['default'];
+      cursor = conn.cursor();
+      cursor.execute('''
+        CREATE TABLE IF NOT EXISTS public.dynamic_models_modelschema (
+          id            serial PRIMARY KEY,
+          name          varchar(100) NOT NULL UNIQUE,
+          db_name       varchar(100) NOT NULL DEFAULT $$default$$,
+          db_table_name varchar(100),
+          managed       boolean NOT NULL DEFAULT true
+        )
+      ''');
+      cursor.execute('''
+        CREATE TABLE IF NOT EXISTS public.dynamic_models_fieldschema (
+          id              serial PRIMARY KEY,
+          name            varchar(100) NOT NULL,
+          class_name      varchar(255) NOT NULL,
+          model_schema_id integer NOT NULL
+            REFERENCES public.dynamic_models_modelschema(id) ON DELETE CASCADE,
+          kwargs          jsonb NOT NULL DEFAULT $${}$$,
+          UNIQUE (name, model_schema_id)
+        )
+      ''');
+      cursor.execute('GRANT ALL ON TABLE public.dynamic_models_modelschema TO {{ postgres_user }}');
+      cursor.execute('GRANT ALL ON TABLE public.dynamic_models_fieldschema TO {{ postgres_user }}');
+      cursor.execute('GRANT USAGE, SELECT ON SEQUENCE dynamic_models_modelschema_id_seq TO {{ postgres_user }}');
+      cursor.execute('GRANT USAGE, SELECT ON SEQUENCE dynamic_models_fieldschema_id_seq TO {{ postgres_user }}');
+      conn.connection.commit();
+      print('dynamic_models OK — banco geonode')"
+  changed_when: false
+  tags: [geonode, migrate]
+
+- name: Garante tabelas dynamic_models no banco geodata (geonode_data)
+  community.docker.docker_container_exec:
+    container: geonode_django
+    command: >-
+      python manage.py shell -c
+      "from django.db import connections;
+      conn = connections['datastore'];
+      cursor = conn.cursor();
+      cursor.execute('''
+        CREATE TABLE IF NOT EXISTS public.dynamic_models_modelschema (
+          id            serial PRIMARY KEY,
+          name          varchar(100) NOT NULL UNIQUE,
+          db_name       varchar(100) NOT NULL DEFAULT $$default$$,
+          db_table_name varchar(100),
+          managed       boolean NOT NULL DEFAULT true
+        )
+      ''');
+      cursor.execute('''
+        CREATE TABLE IF NOT EXISTS public.dynamic_models_fieldschema (
+          id              serial PRIMARY KEY,
+          name            varchar(100) NOT NULL,
+          class_name      varchar(255) NOT NULL,
+          model_schema_id integer NOT NULL
+            REFERENCES public.dynamic_models_modelschema(id) ON DELETE CASCADE,
+          kwargs          jsonb NOT NULL DEFAULT $${}$$,
+          UNIQUE (name, model_schema_id)
+        )
+      ''');
+      cursor.execute('GRANT ALL ON TABLE public.dynamic_models_modelschema TO {{ postgres_user }}');
+      cursor.execute('GRANT ALL ON TABLE public.dynamic_models_fieldschema TO {{ postgres_user }}');
+      cursor.execute('GRANT USAGE, SELECT ON SEQUENCE dynamic_models_modelschema_id_seq TO {{ postgres_user }}');
+      cursor.execute('GRANT USAGE, SELECT ON SEQUENCE dynamic_models_fieldschema_id_seq TO {{ postgres_user }}');
+      conn.connection.commit();
+      print('dynamic_models OK — banco geonode_data')"
+  changed_when: false
+  tags: [geonode, migrate]
+
 - name: Cria ou atualiza superusuário GeoNode
   # Usa get_or_create + set_password para garantir que a senha é
   # sempre sincronizada com envs/.env, mesmo em re-deploys.
