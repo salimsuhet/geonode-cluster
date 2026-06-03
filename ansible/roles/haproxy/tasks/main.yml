@@ -1,11 +1,12 @@
 ---
 # roles/haproxy/tasks/main.yml
 
-- name: Instala HAProxy
+- name: Instala HAProxy e openssl
   apt:
     name:
       - haproxy
       - socat
+      - openssl
     state: present
     update_cache: yes
   tags: [haproxy]
@@ -16,6 +17,101 @@
     enabled: yes
   tags: [haproxy]
 
+- name: Cria diretório de certificados
+  file:
+    path: /etc/haproxy/certs
+    state: directory
+    owner: root
+    group: haproxy
+    mode: '0750'
+  tags: [haproxy]
+
+# ------------------------------------------------------------------
+# TLS — certificado autoassinado (HTTPS=1, LETS_ENCRYPT=0)
+#
+# Gerado ANTES do haproxy.cfg para que a validação do template
+# ('haproxy -c -f') já encontre o .pem no lugar certo.
+# Válido por 10 anos. SAN inclui o hostname e o IP do VIP.
+# ------------------------------------------------------------------
+- name: "[TLS] Gera certificado autoassinado"
+  when: https_enabled and not letsencrypt
+  shell: |
+    openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
+      -keyout /etc/haproxy/certs/{{ geonode_public_hostname }}.key \
+      -out    /etc/haproxy/certs/{{ geonode_public_hostname }}.crt \
+      -subj "/CN={{ geonode_public_hostname }}/O=GeoNode/C=BR" \
+      -addext "subjectAltName=DNS:{{ geonode_public_hostname }},IP:{{ haproxy_vip }}"
+    cat /etc/haproxy/certs/{{ geonode_public_hostname }}.crt \
+        /etc/haproxy/certs/{{ geonode_public_hostname }}.key \
+      > /etc/haproxy/certs/{{ geonode_public_hostname }}.pem
+    chmod 640 /etc/haproxy/certs/{{ geonode_public_hostname }}.pem
+    chown root:haproxy /etc/haproxy/certs/{{ geonode_public_hostname }}.pem
+  args:
+    creates: /etc/haproxy/certs/{{ geonode_public_hostname }}.pem
+  tags: [haproxy, tls]
+
+# ------------------------------------------------------------------
+# TLS — certificado Let's Encrypt (HTTPS=1, LETS_ENCRYPT=1)
+#
+# Usa certbot standalone na porta 8888. O HAProxy redireciona
+# /.well-known/acme-challenge/ para este backend sem parar o serviço.
+#
+# Pré-requisitos:
+#   - GEONODE_PUBLIC_HOSTNAME com DNS público apontado para o VIP
+#   - Porta 80 acessível da internet
+#   - LETSENCRYPT_EMAIL definido no .env
+# ------------------------------------------------------------------
+- name: "[TLS] Instala certbot"
+  when: https_enabled and letsencrypt
+  apt:
+    name: certbot
+    state: present
+    update_cache: yes
+  tags: [haproxy, tls]
+
+- name: "[TLS] Obtém certificado Let's Encrypt (certbot standalone porta 8888)"
+  when: https_enabled and letsencrypt
+  shell: |
+    certbot certonly --standalone \
+      --http-01-port 8888 \
+      --non-interactive \
+      --agree-tos \
+      --email {{ letsencrypt_email }} \
+      -d {{ geonode_public_hostname }}
+    cat /etc/letsencrypt/live/{{ geonode_public_hostname }}/fullchain.pem \
+        /etc/letsencrypt/live/{{ geonode_public_hostname }}/privkey.pem \
+      > /etc/haproxy/certs/{{ geonode_public_hostname }}.pem
+    chmod 640 /etc/haproxy/certs/{{ geonode_public_hostname }}.pem
+    chown root:haproxy /etc/haproxy/certs/{{ geonode_public_hostname }}.pem
+  args:
+    creates: /etc/haproxy/certs/{{ geonode_public_hostname }}.pem
+  environment: "{{ proxy_env }}"
+  notify: Reload HAProxy
+  tags: [haproxy, tls]
+
+- name: "[TLS] Instala cron de renovação automática Let's Encrypt"
+  when: https_enabled and letsencrypt
+  cron:
+    name: "certbot renew"
+    minute: "30"
+    hour: "3"
+    weekday: "1"
+    job: >
+      certbot renew --quiet
+      --deploy-hook "cat /etc/letsencrypt/live/{{ geonode_public_hostname }}/fullchain.pem
+                         /etc/letsencrypt/live/{{ geonode_public_hostname }}/privkey.pem
+                       > /etc/haproxy/certs/{{ geonode_public_hostname }}.pem &&
+                     chmod 640 /etc/haproxy/certs/{{ geonode_public_hostname }}.pem &&
+                     chown root:haproxy /etc/haproxy/certs/{{ geonode_public_hostname }}.pem &&
+                     systemctl reload haproxy"
+  tags: [haproxy, tls]
+
+# ------------------------------------------------------------------
+# Gera o haproxy.cfg DEPOIS dos certificados para que a validação
+# interna ('haproxy -c -f') já encontre o .pem no lugar.
+# Quando HTTPS=0 a validação roda normalmente.
+# Quando HTTPS=1 a validação também roda — o .pem já existe neste ponto.
+# ------------------------------------------------------------------
 - name: Gera configuração HAProxy
   template:
     src: haproxy.cfg.j2
@@ -26,15 +122,6 @@
     validate: 'haproxy -c -f %s'
   notify: Reload HAProxy
   tags: [haproxy, config]
-
-- name: Cria diretório de certificados (para HTTPS futuro)
-  file:
-    path: /etc/haproxy/certs
-    state: directory
-    owner: root
-    group: haproxy
-    mode: '0750'
-  tags: [haproxy]
 
 - name: Habilita binding a IPs não locais (para VIP Keepalived)
   sysctl:

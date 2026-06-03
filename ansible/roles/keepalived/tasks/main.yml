@@ -8,16 +8,25 @@
     state: present
   tags: [keepalived]
 
-# ── Detecta interface de rede privada automaticamente ─────────────────────────
-# No Ubuntu 24.04 a nomenclatura é enp0s8 / ens6, não eth1
-- name: Detecta interface de rede privada (fallback se keepalived_interface=eth1)
+# ------------------------------------------------------------------
+# Detecta a interface de rede correta para o VIP.
+#
+# Estratégia: procura a interface que já tem o IP do próprio host
+# (ansible_host) atribuído. Isso é 100% confiável em qualquer
+# ambiente (Vagrant eth1, OpenStack ens3, AWS enp0s8, etc.) sem
+# depender de nomes ou ordem de interfaces.
+# ------------------------------------------------------------------
+- name: Detecta interface que carrega o IP do host
   set_fact:
     keepalived_interface: >-
       {{ ansible_interfaces
-         | reject('equalto', 'lo')
-         | select('match', '^(eth|enp|ens)')
-         | list | last }}
-  when: keepalived_interface == 'eth1' and ansible_interfaces is defined
+         | map('regex_replace', '^(.*)$', 'ansible_\1')
+         | map('extract', hostvars[inventory_hostname])
+         | selectattr('ipv4', 'defined')
+         | selectattr('ipv4.address', 'equalto', ansible_host)
+         | map(attribute='device')
+         | first
+         | default(keepalived_interface) }}
   tags: [keepalived]
 
 - name: Exibe interface selecionada para o Keepalived

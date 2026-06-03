@@ -72,6 +72,12 @@ frontend http_frontend
     http-response set-header X-Frame-Options SAMEORIGIN
     http-response set-header X-Content-Type-Options nosniff
 
+{% if https_enabled %}
+    # HTTPS ativo: redireciona todo HTTP → HTTPS, exceto ACME challenge
+    acl is_acme path_beg /.well-known/acme-challenge/
+    redirect scheme https code 301 if !is_acme
+    use_backend letsencrypt_backend if is_acme
+{% else %}
     # ACLs — identifica o tipo de requisição
     acl is_geoserver        path_beg /geoserver
     acl is_geoserver_admin  path_beg /geoserver/web
@@ -102,7 +108,47 @@ frontend http_frontend
     use_backend geoserver_write if is_geoserver is_wcs_write
     use_backend geoserver_read  if is_geoserver
     default_backend geonode_app
+{% endif %}
 
+{% if https_enabled %}
+#---------------------------------------------------------------------
+# Frontend HTTPS principal (TLS termina aqui)
+#---------------------------------------------------------------------
+frontend https_frontend
+    bind *:{{ haproxy_https_port }} ssl crt /etc/haproxy/certs/{{ geonode_public_hostname }}.pem alpn h2,http/1.1
+
+    # Propaga o esquema para o Django (SECURE_PROXY_SSL_HEADER)
+    http-request set-header X-Forwarded-Proto https
+
+    # Cabeçalhos de segurança
+    http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    http-response set-header X-Frame-Options SAMEORIGIN
+    http-response set-header X-Content-Type-Options nosniff
+
+    # ACLs — identifica o tipo de requisição
+    acl is_geoserver        path_beg /geoserver
+    acl is_geoserver_admin  path_beg /geoserver/web
+    acl is_geoserver_admin  path_beg /geoserver/j_spring_security
+    acl is_geoserver_admin  path /geoserver
+    acl is_geoserver_admin  path_beg /geoserver/index.html
+    acl is_geoserver_admin  path_beg /geoserver/j_spring_oauth2
+    acl is_write_method     method   POST PUT DELETE PATCH
+    acl is_wfs_transaction  path_sub -i service=WFS request=Transaction
+    acl is_wcs_write        path_sub -i service=WCS request=Insert
+    acl is_wcs_write        path_sub -i service=WCS request=Delete
+    acl is_wcs_write        path_sub -i service=WCS request=Update
+
+    http-request set-path /geoserver/j_spring_oauth2_geonode_login if { path /geoserver/web/j_spring_oauth2_geonode_login }
+    http-request set-path /geoserver/j_spring_oauth2_geonode_logout if { path /geoserver/web/j_spring_oauth2_geonode_logout }
+
+    use_backend geoserver_write if is_geoserver is_geoserver_admin
+    use_backend geoserver_write if is_geoserver is_write_method
+    use_backend geoserver_write if is_geoserver is_wfs_transaction
+    use_backend geoserver_write if is_geoserver is_wcs_write
+    use_backend geoserver_read  if is_geoserver
+    default_backend geonode_app
+
+{% endif %}
 #---------------------------------------------------------------------
 # Backend — GeoServer WRITE (Master)
 #---------------------------------------------------------------------
@@ -153,3 +199,13 @@ backend geonode_app
     http-request set-header X-Forwarded-For %[src]
 
     server geonode {{ ip_geonode }}:80 check inter 15s fall 3 rise 2
+
+{% if https_enabled %}
+#---------------------------------------------------------------------
+# Backend — Let's Encrypt (ACME challenge via HTTP)
+# Apenas presente quando HTTPS=1; serve o .well-known/acme-challenge/
+# respondido pelo certbot standalone rodando localmente na porta 8888.
+#---------------------------------------------------------------------
+backend letsencrypt_backend
+    server certbot 127.0.0.1:8888
+{% endif %}

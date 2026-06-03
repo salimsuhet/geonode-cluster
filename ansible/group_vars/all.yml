@@ -131,6 +131,25 @@ haproxy_client_timeout:  "{{ lookup('env', 'HAPROXY_CLIENT_TIMEOUT')  | default(
 haproxy_server_timeout:  "{{ lookup('env', 'HAPROXY_SERVER_TIMEOUT')  | default('60s',     true) }}"
 
 # -----------------------------------------------------------------------------
+# HTTPS / TLS
+#
+# HTTPS=1            → habilita TLS no HAProxy (porta 443) e redireciona HTTP→HTTPS
+# LETS_ENCRYPT=1     → obtém certificado via Certbot (requer acesso à internet e
+#                      GEONODE_PUBLIC_HOSTNAME com DNS público apontado para o VIP)
+# LETS_ENCRYPT=0     → gera certificado autoassinado (ambientes internos/Vagrant)
+#
+# O certificado fica em /etc/haproxy/certs/<hostname>.pem (formato HAProxy:
+# fullchain + privkey concatenados em um único arquivo).
+# -----------------------------------------------------------------------------
+https_enabled:     "{{ HTTPS             | default(lookup('env', 'HTTPS')             | default('0', true), true) | int | bool }}"
+letsencrypt:       "{{ LETS_ENCRYPT      | default(lookup('env', 'LETS_ENCRYPT')      | default('0', true), true) | int | bool }}"
+letsencrypt_email: "{{ LETSENCRYPT_EMAIL | default(lookup('env', 'LETSENCRYPT_EMAIL') | default('admin@' ~ geonode_public_hostname, true), true) }}"
+
+# Esquema público derivado de https_enabled — usado em geonode.env.j2
+# para SITEURL, GEOSERVER_PUBLIC_LOCATION e cabeçalhos Django CSRF/SECURE.
+public_scheme: "{{ 'https' if https_enabled else 'http' }}"
+
+# -----------------------------------------------------------------------------
 # KEEPALIVED
 # -----------------------------------------------------------------------------
 keepalived_vrrp_id:       "{{ lookup('env', 'KEEPALIVED_VRRP_ID')       | default('51',       true) }}"
