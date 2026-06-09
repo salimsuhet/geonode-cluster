@@ -160,9 +160,12 @@ backend geoserver_write
 
     cookie SERVERID insert indirect nocache
 
-    http-request set-header X-Forwarded-Host %[req.hdr(Host)]
-    http-request set-header X-Real-IP       %[src]
-    http-request set-header X-Forwarded-For %[src]
+    http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
+    http-request set-header X-Real-IP        %[src]
+    http-request set-header X-Forwarded-For  %[src]
+{% if https_enabled %}
+    http-request set-header X-Forwarded-Proto https
+{% endif %}
 
     server geoserver-write {{ ip_geoserver_write }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 cookie geoserver-write
 
@@ -175,9 +178,12 @@ backend geoserver_read
     http-check  send meth GET uri /geoserver/web/ ver HTTP/1.1 hdr Host {{ ip_geoserver_write }}
     http-check  expect rstatus 200|302
 
-    http-request set-header X-Forwarded-Host %[req.hdr(Host)]
-    http-request set-header X-Real-IP       %[src]
-    http-request set-header X-Forwarded-For %[src]
+    http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
+    http-request set-header X-Real-IP        %[src]
+    http-request set-header X-Forwarded-For  %[src]
+{% if https_enabled %}
+    http-request set-header X-Forwarded-Proto https
+{% endif %}
 
     server geoserver-read-1 {{ ip_geoserver_read_1 }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 weight 10
     server geoserver-read-2 {{ ip_geoserver_read_2 }}:{{ geoserver_port }} check inter 10s fall 3 rise 2 weight 10
