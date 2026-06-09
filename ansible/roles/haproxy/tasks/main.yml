@@ -89,6 +89,31 @@
   notify: Reload HAProxy
   tags: [haproxy, tls]
 
+# ------------------------------------------------------------------
+# O certbot só roda no haproxy-1 (que tem o FIP associado e passa
+# no ACME challenge). O haproxy-2 precisa do mesmo .pem para que
+# o HAProxy valide a config e suba normalmente.
+# Lê o .pem do haproxy-1 e distribui para os demais nós do grupo.
+# ------------------------------------------------------------------
+- name: "[TLS] Lê certificado gerado no haproxy-1"
+  when: https_enabled and letsencrypt
+  slurp:
+    src: "/etc/haproxy/certs/{{ geonode_public_hostname }}.pem"
+  register: haproxy_cert_pem
+  delegate_to: "{{ groups['haproxy'][0] }}"
+  run_once: true
+  tags: [haproxy, tls]
+
+- name: "[TLS] Copia certificado para todos os nós HAProxy"
+  when: https_enabled and letsencrypt
+  copy:
+    content: "{{ haproxy_cert_pem.content | b64decode }}"
+    dest: "/etc/haproxy/certs/{{ geonode_public_hostname }}.pem"
+    owner: root
+    group: haproxy
+    mode: '0640'
+  tags: [haproxy, tls]
+
 - name: "[TLS] Instala cron de renovação automática Let's Encrypt"
   when: https_enabled and letsencrypt
   cron:
