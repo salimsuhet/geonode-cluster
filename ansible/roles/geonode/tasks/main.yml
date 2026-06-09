@@ -267,7 +267,7 @@
       python manage.py shell -c
       "from oauth2_provider.models import Application;
       app = Application.objects.filter(name='GeoServer').first();
-      app and setattr(app, 'redirect_uris', 'http://{{ geonode_public_hostname }}/geoserver/web/\nhttp://{{ geonode_public_hostname }}/geoserver/index.html') or None;
+      app and setattr(app, 'redirect_uris', '{{ public_scheme }}://{{ geonode_public_hostname }}/geoserver/web/\n{{ public_scheme }}://{{ geonode_public_hostname }}/geoserver/index.html') or None;
       app and app.save();
       print('redirect_uris:', app.redirect_uris if app else 'app not found')"
   changed_when: false

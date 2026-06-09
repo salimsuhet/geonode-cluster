@@ -96,14 +96,7 @@
     minute: "30"
     hour: "3"
     weekday: "1"
-    job: >
-      certbot renew --quiet
-      --deploy-hook "cat /etc/letsencrypt/live/{{ geonode_public_hostname }}/fullchain.pem
-                         /etc/letsencrypt/live/{{ geonode_public_hostname }}/privkey.pem
-                       > /etc/haproxy/certs/{{ geonode_public_hostname }}.pem &&
-                     chmod 640 /etc/haproxy/certs/{{ geonode_public_hostname }}.pem &&
-                     chown root:haproxy /etc/haproxy/certs/{{ geonode_public_hostname }}.pem &&
-                     systemctl reload haproxy"
+    job: "certbot renew --quiet --deploy-hook 'cat /etc/letsencrypt/live/{{ geonode_public_hostname }}/fullchain.pem /etc/letsencrypt/live/{{ geonode_public_hostname }}/privkey.pem > /etc/haproxy/certs/{{ geonode_public_hostname }}.pem && chmod 640 /etc/haproxy/certs/{{ geonode_public_hostname }}.pem && chown root:haproxy /etc/haproxy/certs/{{ geonode_public_hostname }}.pem && systemctl reload haproxy'"
   tags: [haproxy, tls]
 
 # ------------------------------------------------------------------

@@ -27,10 +27,10 @@
     userAuthorizationUri — redirect do browser do usuário.
     Usa o hostname público pois é o browser que acessa, não o GeoServer.
   -->
-  <userAuthorizationUri>http://{{ geonode_public_hostname }}/o/authorize/</userAuthorizationUri>
+  <userAuthorizationUri>{{ public_scheme }}://{{ geonode_public_hostname }}/o/authorize/</userAuthorizationUri>
 
   <!-- GeoServer Public URL — redirect do browser após autorização -->
-  <redirectUri>http://{{ geonode_public_hostname }}/geoserver/index.html</redirectUri>
+  <redirectUri>{{ public_scheme }}://{{ geonode_public_hostname }}/geoserver/index.html</redirectUri>
 
   <!--
     checkTokenEndpointUrl — chamada server-side (GeoServer → GeoNode).
@@ -44,12 +44,12 @@
   <checkTokenEndpointUrl>http://{{ ip_geonode }}/api/o/v4/tokeninfo/</checkTokenEndpointUrl>
 
   <!-- GeoNode logoutUri — redirect do browser -->
-  <logoutUri>http://{{ geonode_public_hostname }}/account/logout/</logoutUri>
+  <logoutUri>{{ public_scheme }}://{{ geonode_public_hostname }}/account/logout/</logoutUri>
 
   <scopes>write</scopes>
   <enableRedirectAuthenticationEntryPoint>false</enableRedirectAuthenticationEntryPoint>
-  <forceAccessTokenUriHttps>false</forceAccessTokenUriHttps>
-  <forceUserAuthorizationUriHttps>false</forceUserAuthorizationUriHttps>
+  <forceAccessTokenUriHttps>{{ 'true' if https_enabled else 'false' }}</forceAccessTokenUriHttps>
+  <forceUserAuthorizationUriHttps>{{ 'true' if https_enabled else 'false' }}</forceUserAuthorizationUriHttps>
 
   <!--
     loginEndpoint e logoutEndpoint usam o path sem prefixo /web/.
