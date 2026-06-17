@@ -43,6 +43,25 @@
   notify: Restart GeoNode
   tags: [geonode, config, oauth2]
 
+# ------------------------------------------------------------------
+# geonode.conf.envsubst — substitui o arquivo equivalente da imagem
+# geonode/nginx. O docker-entrypoint.sh da imagem recalcula a
+# variável $HTTP_SCHEME sempre a partir de HTTPS_HOST (http se vazio,
+# https se preenchido) — não há como fixá-la via env var. Como TLS
+# termina no HAProxy (não no Nginx do GeoNode), precisamos que o
+# Nginx fale HTTP puro com o Django mas ainda assim reporte
+# X-Forwarded-Proto: https. Por isso este arquivo é idêntico ao
+# original, exceto que usa $PUBLIC_SCHEME (controlada por nós via
+# Ansible) no lugar de $HTTP_SCHEME.
+# ------------------------------------------------------------------
+- name: Copia geonode.conf.envsubst customizado (X-Forwarded-Proto correto)
+  copy:
+    src: geonode.conf.envsubst
+    dest: /opt/geonode/geonode.conf.envsubst
+    mode: '0644'
+  notify: Restart GeoNode
+  tags: [geonode, config]
+
 - name: Cria serviço systemd GeoNode
   template:
     src: geonode.service.j2

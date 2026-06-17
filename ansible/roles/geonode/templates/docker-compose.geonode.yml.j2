@@ -102,15 +102,33 @@ services:
       GEONODE_LB_PORT: ""
       GEOSERVER_LB_HOST_IP: "geoserver"
       GEOSERVER_LB_PORT: "{{ geoserver_port }}"
+      # TLS termina no HAProxy, não no Nginx do GeoNode. HTTPS_HOST/
+      # HTTPS_PORT só devem ser usados quando o PRÓPRIO Nginx termina
+      # TLS (fluxo Let's Encrypt embutido da imagem); setá-las aqui faz
+      # o nginx.conf.envsubst gerar um listener :80 que redireciona
+      # para https://, e como o HAProxy sempre fala HTTP puro com este
+      # Nginx (na porta 80), isso gera looping de redirect.
       HTTP_HOST: "{{ geonode_public_hostname }}"
       HTTP_PORT: "80"
-      HTTP_SCHEME: "http"
+      HTTPS_HOST: ""
+      HTTPS_PORT: ""
+      LETSENCRYPT_MODE: "False"
       PUBLIC_HOST: "{{ geonode_public_hostname }}"
+      # O docker-entrypoint.sh da imagem recalcula $HTTP_SCHEME sempre
+      # a partir de HTTPS_HOST (http se vazio, https se preenchido) —
+      # não é possível fixá-lo via env var, ele é sempre sobrescrito.
+      # Por isso usamos nosso próprio geonode.conf.envsubst (montado
+      # abaixo), que troca $HTTP_SCHEME por $PUBLIC_SCHEME — uma
+      # variável só nossa, que o envsubst do entrypoint também
+      # processa (ele substitui TODAS as env vars definidas, não uma
+      # lista fixa), e que controlamos diretamente pelo Ansible.
+      PUBLIC_SCHEME: "{{ public_scheme }}"
     ports:
       - "80:80"
     volumes:
       - statics:/mnt/volumes/statics
       - /opt/geonode/nginx-internal.conf:/etc/nginx/sites-enabled/internal.conf:ro
+      - /opt/geonode/geonode.conf.envsubst:/etc/nginx/sites-enabled/geonode.conf.envsubst:ro
     depends_on:
       - django
     networks:
